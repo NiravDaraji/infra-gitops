@@ -1,0 +1,26 @@
+name: Promote Dev To Staging
+
+on:
+  workflow_dispatch:   # manual trigger only
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "NiravDaraji"
+          git config --global user.email "nirav78692@gmail.com"
+
+      - name: Fetch Branches
+        run: |
+          git fetch origin
+
+      - name: Merge dev → staging
+        run: |
+          git checkout -B staging origin/staging
+          git merge origin/dev --no-edit
+          git push origin staging
