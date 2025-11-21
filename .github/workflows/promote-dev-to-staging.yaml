@@ -2,7 +2,8 @@ name: Promote Dev To Staging
 
 on:
   workflow_dispatch:   # manual trigger only
-
+permissions:
+  contents: write
 jobs:
   promote:
     runs-on: ubuntu-latest
