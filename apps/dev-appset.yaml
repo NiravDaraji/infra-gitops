@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: dev-applications
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/NiravDaraji/infra-gitops.git
+        revision: dev
+        directories:
+          - path: charts/*       # all helm apps under charts/
+
+  template:
+    metadata:
+      name: '{{path.basename}}-dev'
+    spec:
+      project: default
+
+      source:
+        repoURL: https://github.com/NiravDaraji/infra-gitops.git
+        targetRevision: dev
+        path: '{{path}}'                     # path to each chart folder
+        helm:
+          valueFiles:
+            - '../../environments/dev/values-{{path.basename}}.yaml'
+
+      destination:
+        server: https://10.139.9.41:6443      # DEV cluster
+        namespace: default
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
