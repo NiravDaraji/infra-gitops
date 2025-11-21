@@ -1,2 +1,2 @@
 # infra-gitops
-created repository for automation flow.
+Created for automation flow.
