@@ -1,9 +1,10 @@
 name: Promote Dev To Staging
 
 on:
-  workflow_dispatch:   # manual trigger only
+  workflow_dispatch:
 permissions:
   contents: write
+
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -17,11 +18,18 @@ jobs:
           git config --global user.email "nirav78692@gmail.com"
 
       - name: Fetch Branches
-        run: |
-          git fetch origin
+        run: git fetch origin
 
       - name: Merge dev → staging
         run: |
           git checkout -B staging origin/staging
           git merge origin/dev --no-edit
-          git push origin staging
+
+      - name: Copy values-openspeedtest.yaml from dev to staging
+        run: |
+          cp environments/dev/values-openspeedtest.yaml environments/staging/values-openspeedtest.yaml
+          git add environments/staging/values-openspeedtest.yaml
+          git commit -m "Sync values.yaml from dev to staging"
+
+      - name: Push staging
+        run: git push origin staging
