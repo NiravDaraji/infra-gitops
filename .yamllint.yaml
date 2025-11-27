@@ -1,18 +1,21 @@
-# .yamllint.yaml
 extends: default
 
 rules:
-  document-start: disable    # Many k8s manifests omit '---'
-  line-length: disable       # Often long lines exist in annotations/env vars
-  truthy: disable            # K8s uses "true"/"false" strings in places
-  comments: disable          # Relax comment style
+  document-start: disable        # K8s manifests often omit '---'
+  line-length: disable           # Ignore long lines (annotations/env vars)
+  truthy: disable                # K8s uses "true"/"false" strings
+  comments: disable              # Relax comment style
   indentation:
     spaces: 2
     indent-sequences: true
   trailing-spaces: enable
   new-lines:
     type: unix
+  empty-values: disable          # Helm templates often have empty values
+  key-duplicates: disable        # Helm templates may repeat keys in loops
 
 ignore: |
-  charts/**/templates/**     # Helm templates contain Go templating, not pure YAML
+  charts/**/templates/**         # Ignore Helm templates
+  charts/**/values.yaml          # Ignore Helm default values
+  environments/**                # Ignore environment-specific overrides
   **/.github/**
