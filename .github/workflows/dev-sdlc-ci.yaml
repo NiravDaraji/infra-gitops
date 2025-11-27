@@ -1,0 +1,102 @@
+name: "SDLC: Dev Validation Pipeline"
+
+on:
+  pull_request:
+    branches: [ dev ]
+  push:
+    branches: [ dev ]
+
+jobs:
+  sdlc-validation:
+    runs-on: ubuntu-latest
+    env:
+      KUBE_VERSION: "1.29.0"
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Install Helm
+      - name: Install Helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      # 3. Install kubectl
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/v${KUBE_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+
+      # 4. YAML Lint
+      - name: YAML Lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .yamllint.yaml
+
+      # 5. Helm Lint (all charts)
+      - name: Helm Lint
+        run: |
+          for chart in charts/*; do
+            echo "Linting $chart ..."
+            helm lint "$chart"
+          done
+
+      # 6. Helm Template Dry Run per APP
+      - name: Helm Template Dry Run (Dev values)
+        run: |
+          for file in environments/dev/*.yaml; do
+            app=$(basename "$file" | sed 's/^values-//; s/.yaml$//')
+            echo "Rendering: $app"
+            helm template "$app" "charts/$app" -f "environments/dev/values-$app.yaml"
+          done
+
+      # 7. Kubernetes Dry Run Validation (Requires kubeval)
+      - name: Install kubeval
+        run: |
+          curl -sLO https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+          tar xf kubeval-linux-amd64.tar.gz
+          sudo mv kubeval /usr/local/bin/
+
+      - name: Validate Rendered Manifests
+        run: |
+          mkdir rendered
+          for file in environments/dev/*.yaml; do
+            app=$(basename "$file" | sed 's/^values-//; s/.yaml$//')
+            helm template "$app" "charts/$app" -f "environments/dev/values-$app.yaml" > rendered/$app.yaml
+          done
+
+          kubeval rendered/*.yaml --strict
+
+      # 8. Trivy Security Scan (Charts + Manifests)
+      - name: Trivy Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          ignore-unfixed: true
+    
+     
+      # 9. Validate Dev Deployment is Healthy (requires ArgoCD CLI)
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o argocd \
+            https://github.com/argoproj/argo-cd/releases/download/v2.9.3/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/
+
+      - name: Verify Dev Deployment Health
+        run: |
+          argocd login 10.139.9.158:31181 \
+            --username admin \
+            --password Admin@1234 \
+            --insecure
+          argocd app list
+
+      # 12. Mark SDLC validated
+      - name: SDLC Passed
+        run: echo "SDLC checks completed successfully."
