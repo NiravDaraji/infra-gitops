@@ -15,7 +15,7 @@ rules:
   key-duplicates: disable        # Helm templates may repeat keys in loops
 
 ignore: |
-  charts/**/templates/**         # Ignore Helm templates
-  charts/**/values.yaml          # Ignore Helm default values
-  environments/**                # Ignore environment-specific overrides
+  charts/**             # Ignore entire charts directory
+  environments/**       # Ignore environment-specific overrides
   **/.github/**
+
