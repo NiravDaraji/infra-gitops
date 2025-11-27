@@ -77,8 +77,8 @@ jobs:
 
       - name: Verify Deployment Health
         run: |
-          argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure
-          argocd app list
+          #argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure
+          #argocd app list
           # Optional: wait for specific app health
           # argocd app wait openspeedtest-dev --health --timeout 600
 
