@@ -1,21 +1,21 @@
+
 extends: default
 
 rules:
-  document-start: disable        # K8s manifests often omit '---'
-  line-length: disable           # Ignore long lines (annotations/env vars)
-  truthy: disable                # K8s uses "true"/"false" strings
-  comments: disable              # Relax comment style
+  document-start: disable
+  line-length: disable
+  truthy: disable
+  comments: disable
   indentation:
     spaces: 2
-    indent-sequences: true
+    indent-sequences: false
   trailing-spaces: enable
   new-lines:
     type: unix
-  empty-values: disable          # Helm templates often have empty values
-  key-duplicates: disable        # Helm templates may repeat keys in loops
+  empty-values: disable
+  key-duplicates: disable
+  empty-lines: disable    # Disable blank line rule
 
 ignore: |
-  charts/**             # Ignore entire charts directory
-  environments/**       # Ignore environment-specific overrides
-  **/.github/**
-
+  charts/**               # Ignore entire charts directory (Chart.yaml, templates, index.yaml)
+  environments/**         # Ignore environment-specific overrides
