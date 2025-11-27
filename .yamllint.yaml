@@ -14,8 +14,9 @@ rules:
     type: unix
   empty-values: disable
   key-duplicates: disable
-  empty-lines: disable    # Disable blank line rule
+  empty-lines: disable
 
-ignore: |
-  charts/**               # Ignore entire charts directory (Chart.yaml, templates, index.yaml)
-  environments/**         # Ignore environment-specific overrides
+ignore:
+  - charts/**         # Ignore all charts (Chart.yaml, templates, index.yaml, etc.)
+  - environments/**   # Ignore environment-specific overrides
+  - .github/**        # Ignore CI config if you don’t want to lint it
