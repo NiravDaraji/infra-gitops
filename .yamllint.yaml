@@ -1,4 +1,3 @@
-
 extends: default
 
 rules:
@@ -6,17 +5,24 @@ rules:
   line-length: disable
   truthy: disable
   comments: disable
+
   indentation:
     spaces: 2
     indent-sequences: false
+
   trailing-spaces: enable
   new-lines:
     type: unix
+
   empty-values: disable
-  key-duplicates: disable
+  key-duplicates: enable
   empty-lines: disable
 
 ignore:
-  - charts/**         # Ignore all charts (Chart.yaml, templates, index.yaml, etc.)
-  - environments/**   # Ignore environment-specific overrides
-  - .github/**        # Ignore CI config if you don’t want to lint it
+  - charts/**          # Ignore all Helm charts
+  - charts/**/templates/**  # Ignore all template YAML
+  - charts/**/tests/**       # Ignore helm-unittest test YAML
+  - environments/**    # Ignore all environment value files
+  - .github/**         # Ignore GitHub workflows (optional)
+  - "**/*.tpl"         # Ignore Helm helper templates
+  - "**/*.yamllint*"   # Ignore own config
