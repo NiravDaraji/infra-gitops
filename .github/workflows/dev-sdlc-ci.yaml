@@ -1,4 +1,4 @@
-name: "SDLC: Dev Validation Pipeline"
+name: "SDLC: Validation Pipeline"
 
 on:
   workflow_dispatch:
@@ -7,19 +7,23 @@ on:
         description: "Environment to validate (e.g., dev)"
         required: true
         default: "dev"
+
   pull_request:
     branches: [ dev ]
+
   push:
     branches: [ dev ]
 
 jobs:
   sdlc-validation:
     runs-on: ubuntu-latest
+
     env:
       KUBE_VERSION: "1.29.0"
       ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
 
     steps:
+
       # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,39 +34,46 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm version
 
-      # 3. YAML Lint (non-blocking)
+      # 3. YAML Lint
       - name: YAML Lint
         uses: ibiqlik/action-yamllint@v3
         with:
           config_file: .yamllint.yaml
-        continue-on-error: true   # Do not fail workflow if lint errors exist
+        continue-on-error: true
 
-      # 4. Helm Lint (non-blocking)
+      # 4. Helm Lint
       - name: Helm Lint
         run: |
           for chart in charts/*; do
             if [ -f "$chart/Chart.yaml" ]; then
-              echo "Linting $chart ..."
+              echo "Linting $chart..."
               helm lint "$chart" || echo "Helm lint failed for $chart"
             fi
           done
-        continue-on-error: true   # Report errors but continue
+        continue-on-error: true
 
-      # 5 Helm Unit Tests (critical)
+      # 5. Helm Unit Tests
       - name: Helm Unit Tests
         run: |
           # Install helm-unittest plugin
           helm plugin install https://github.com/helm-unittest/helm-unittest.git
-          
-          # Run unit tests for all charts
+
+          echo "Executing Helm Unit Tests..."
           for chart in charts/*; do
             if [ -f "$chart/Chart.yaml" ]; then
-              echo "Running unit tests for $chart ..."
-              helm unittest "$chart" || exit 1
+
+              # Run only if tests folder exists
+              if [ -d "$chart/tests" ]; then
+                echo "Running unit tests for: $chart"
+                helm unittest "$chart" --color || exit 1
+              else
+                echo "No tests folder found in: $chart – skipping."
+              fi
+
             fi
           done
 
-      # 6. Helm Template Dry Run (critical)
+      # 6. Helm Template Dry Run
       - name: Helm Template Dry Run (${{ env.ENVIRONMENT }} values)
         run: |
           shopt -s nullglob
@@ -72,16 +83,16 @@ jobs:
             helm template "$app" "charts/$app" -f "$file" >/dev/null
           done
 
-      # 7. Trivy Security Scan (non-blocking)
+      # 7. Trivy Security Scan
       - name: Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: config
           severity: HIGH,CRITICAL
-          exit-code: 0            # Always exit successfully
+          exit-code: 0
           ignore-unfixed: true
 
-      # 8. Validate Deployment Health via ArgoCD (critical)
+      # 8. Validate Deployment Health via ArgoCD
       - name: Install ArgoCD CLI
         run: |
           curl -sSL -o argocd \
@@ -91,11 +102,10 @@ jobs:
 
       - name: Verify Deployment Health
         run: |
-          #argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure
-          #argocd app list
-          # Optional: wait for specific app health
+          # argocd login <ARGO_SERVER> --username <user> --password <pass> --insecure
+          # argocd app list
           # argocd app wait openspeedtest-dev --health --timeout 600
 
-      # 9. Mark SDLC validated
+      # 9. SDLC completed
       - name: SDLC Passed
         run: echo "SDLC checks completed successfully."
