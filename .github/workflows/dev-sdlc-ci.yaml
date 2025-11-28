@@ -27,6 +27,8 @@ jobs:
       # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: dev
 
       # 2. Install Helm
       - name: Install Helm
