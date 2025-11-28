@@ -35,7 +35,7 @@ jobs:
         uses: ibiqlik/action-yamllint@v3
         with:
           config_file: .yamllint.yaml
-        continue-on-error: true   #Do not fail workflow if lint errors exist
+        continue-on-error: true   # Do not fail workflow if lint errors exist
 
       # 4. Helm Lint (non-blocking)
       - name: Helm Lint
@@ -46,9 +46,23 @@ jobs:
               helm lint "$chart" || echo "Helm lint failed for $chart"
             fi
           done
-        continue-on-error: true   #Report errors but continue
+        continue-on-error: true   # Report errors but continue
 
-      # 5. Helm Template Dry Run (critical)
+      # 5 Helm Unit Tests (critical)
+      - name: Helm Unit Tests
+        run: |
+          # Install helm-unittest plugin
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git
+          
+          # Run unit tests for all charts
+          for chart in charts/*; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              echo "Running unit tests for $chart ..."
+              helm unittest "$chart" || exit 1
+            fi
+          done
+
+      # 6. Helm Template Dry Run (critical)
       - name: Helm Template Dry Run (${{ env.ENVIRONMENT }} values)
         run: |
           shopt -s nullglob
@@ -58,16 +72,16 @@ jobs:
             helm template "$app" "charts/$app" -f "$file" >/dev/null
           done
 
-      # 6. Trivy Security Scan (non-blocking)
+      # 7. Trivy Security Scan (non-blocking)
       - name: Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: config
           severity: HIGH,CRITICAL
-          exit-code: 0            #Always exit successfully
+          exit-code: 0            # Always exit successfully
           ignore-unfixed: true
 
-      # 7. Validate Deployment Health via ArgoCD (critical)
+      # 8. Validate Deployment Health via ArgoCD (critical)
       - name: Install ArgoCD CLI
         run: |
           curl -sSL -o argocd \
@@ -82,6 +96,6 @@ jobs:
           # Optional: wait for specific app health
           # argocd app wait openspeedtest-dev --health --timeout 600
 
-      # 8. Mark SDLC validated
+      # 9. Mark SDLC validated
       - name: SDLC Passed
         run: echo "SDLC checks completed successfully."
