@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -14,15 +15,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'dev', url: 'https://github.com/NiravDaraji/infra-gitops.git'
-            }
-        }
-
-        stage('Install Helm') {
-            steps {
-                sh '''
-                curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-                helm version
-                '''
             }
         }
 
@@ -50,7 +42,7 @@ pipeline {
         stage('Helm Unit Tests') {
             steps {
                 sh '''
-                helm plugin install https://github.com/helm-unittest/helm-unittest.git
+                helm plugin install https://github.com/helm-unittest/helm-unittest.git || true
                 for chart in charts/*; do
                   if [ -f "$chart/Chart.yaml" ]; then
                     if [ -d "$chart/tests" ]; then
@@ -81,17 +73,7 @@ pipeline {
         stage('Trivy Security Scan') {
             steps {
                 sh '''
-                ./trivy config --severity HIGH,CRITICAL --ignore-unfixed .
-                '''
-            }
-        }
-
-        stage('Install ArgoCD CLI') {
-            steps {
-                sh '''
-                curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/v2.9.3/argocd-linux-amd64
-                chmod +x argocd
-                sudo mv argocd /usr/local/bin/
+                trivy config --severity HIGH,CRITICAL --ignore-unfixed .
                 '''
             }
         }
@@ -109,4 +91,3 @@ pipeline {
         }
     }
 }
-
