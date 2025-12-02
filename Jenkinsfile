@@ -87,13 +87,26 @@ pipeline {
             }
         }
 
-        stage('Trivy Security Scan') {
+        
+stage('Trivy Security Scan (config, optional)') {
             steps {
                 script {
-                    echo "Running Trivy Security Scan..."
-                    sh(script: '''
-                        trivy config --severity HIGH,CRITICAL --ignore-unfixed . || echo "❌ Trivy scan found issues"
-                    ''', returnStatus: true)
+                    echo "🔐 Running Trivy Security Scan (config/misconfigs)..."
+                    sh(script: """
+                      set +e
+                      if command -v trivy >/dev/null 2>&1; then
+                        echo "▶ trivy version: $(trivy --version | head -n 1)"
+                        trivy config \
+                          --severity HIGH,CRITICAL \
+                          --include-non-failures \
+                          --helm-kube-version ${KUBE_VERSION} \
+                          --exit-code 0 \
+                          .
+                      } else {
+                        echo "⚠️ Trivy not found; skipping security scan."
+                      fi
+                    """, returnStatus: true)
+                    echo "Trivy step completed (scan may have findings; review console output)."
                 }
             }
         }
