@@ -22,9 +22,11 @@ pipeline {
             steps {
                 script {
                     echo "Running YAML Lint..."
-                    def result = sh(script: "yamllint -c .yamllint.yaml . || true", returnStatus: true)
+                    def result = sh(script: "yamllint -c .yamllint.yaml .", returnStatus: true)
                     if (result != 0) {
-                        echo "YAML Lint completed with errors. Check console output."
+                        echo "❌ YAML Lint found issues. Check console output."
+                    } else {
+                        echo "✅ YAML Lint passed."
                     }
                 }
             }
@@ -34,14 +36,14 @@ pipeline {
             steps {
                 script {
                     echo "Running Helm Lint..."
-                    sh '''
-                    for chart in charts/*; do
-                      if [ -f "$chart/Chart.yaml" ]; then
-                        echo "Linting $chart..."
-                        helm lint "$chart" || echo "Helm lint failed for $chart"
-                      fi
-                    done
-                    '''
+                    sh(script: '''
+                        for chart in charts/*; do
+                          if [ -f "$chart/Chart.yaml" ]; then
+                            echo "Linting $chart..."
+                            helm lint "$chart" || echo "❌ Helm lint failed for $chart"
+                          fi
+                        done
+                    ''', returnStatus: true)
                 }
             }
         }
@@ -50,19 +52,19 @@ pipeline {
             steps {
                 script {
                     echo "Running Helm Unit Tests..."
-                    sh '''
-                    helm plugin install https://github.com/helm-unittest/helm-unittest.git || true
-                    for chart in charts/*; do
-                      if [ -f "$chart/Chart.yaml" ]; then
-                        if [ -d "$chart/tests" ]; then
-                          echo "Running unit tests for: $chart"
-                          helm unittest "$chart" --color || echo "Unit tests failed for $chart"
-                        else
-                          echo "No tests folder found in: $chart – skipping."
-                        fi
-                      fi
-                    done
-                    '''
+                    sh(script: '''
+                        helm plugin install https://github.com/helm-unittest/helm-unittest.git || true
+                        for chart in charts/*; do
+                          if [ -f "$chart/Chart.yaml" ]; then
+                            if [ -d "$chart/tests" ]; then
+                              echo "Running unit tests for: $chart"
+                              helm unittest "$chart" --color || echo "❌ Unit tests failed for $chart"
+                            else
+                              echo "No tests folder found in: $chart – skipping."
+                            fi
+                          fi
+                        done
+                    ''', returnStatus: true)
                 }
             }
         }
@@ -71,14 +73,16 @@ pipeline {
             steps {
                 script {
                     echo "Running Helm Template Dry Run..."
-                    sh '''
-                    shopt -s nullglob
-                    for file in environments/${ENVIRONMENT}/values-*.yaml; do
-                      app=$(basename "$file" | sed 's/^values-//; s/.yaml$//')
-                      echo "Rendering: $app"
-                      helm template "$app" "charts/$app" -f "$file" >/dev/null || echo "Dry run failed for $app"
-                    done
-                    '''
+                    sh(script: '''
+                        bash -c '
+                        shopt -s nullglob
+                        for file in environments/${ENVIRONMENT}/values-*.yaml; do
+                          app=$(basename "$file" | sed "s/^values-//; s/.yaml$//")
+                          echo "Rendering: $app"
+                          helm template "$app" "charts/$app" -f "$file" >/dev/null || echo "❌ Dry run failed for $app"
+                        done
+                        '
+                    ''', returnStatus: true)
                 }
             }
         }
@@ -87,9 +91,9 @@ pipeline {
             steps {
                 script {
                     echo "Running Trivy Security Scan..."
-                    sh '''
-                    trivy config --severity HIGH,CRITICAL --ignore-unfixed . || echo "Trivy scan found issues"
-                    '''
+                    sh(script: '''
+                        trivy config --severity HIGH,CRITICAL --ignore-unfixed . || echo "❌ Trivy scan found issues"
+                    ''', returnStatus: true)
                 }
             }
         }
@@ -102,14 +106,14 @@ pipeline {
 
         stage('SDLC Summary') {
             steps {
-                echo "SDLC validation completed. Review console logs for details."
+                echo "✅ SDLC validation completed. Review console logs for details."
             }
         }
     }
 
     post {
         always {
-            echo "Pipeline finished. Some checks may have warnings or errors."
+            echo "Pipeline finished successfully (with possible warnings/errors)."
         }
     }
 }
