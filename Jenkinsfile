@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         KUBE_VERSION = "1.29.0"
-        // Use the Jenkins parameter at runtime; defaults to dev
+        // Default ENVIRONMENT from parameter; if not passed, we still guard in shell
         ENVIRONMENT  = "${params.environment ?: 'dev'}"
     }
 
@@ -107,7 +107,7 @@ pipeline {
             steps {
                 script {
                     echo "🧪 Running Helm Template Dry Run..."
-                    // Force bash so 'shopt' works; use $ENVIRONMENT from shell, not Groovy interpolation.
+                    // Force bash; add fallback for ENVIRONMENT; list matched files; keep non-blocking
                     sh(script: '''
                       set +e
                       if ! command -v helm >/dev/null 2>&1; then
@@ -115,16 +115,31 @@ pipeline {
                         exit 0
                       fi
 
-                      bash -lc '
+                      bash -lc "
                         shopt -s nullglob
-                        env_dir="environments/$ENVIRONMENT"
-                        echo "Using ENVIRONMENT=$ENVIRONMENT, env_dir=${env_dir}"
-                        for file in "${env_dir}"/values-*.yaml; do
-                          app=$(basename "$file" | sed "s/^values-//; s/.yaml$//")
-                          echo "Rendering: $app (file: $file)"
-                          helm template "$app" "charts/$app" -f "$file" >/dev/null || echo "❌ Dry run failed for $app"
-                        done
-                      '
+                        # Fallback to dev if ENVIRONMENT not set
+                        ENVIRONMENT=\\"${ENVIRONMENT:-dev}\\"
+                        env_dir=\\"environments/$ENVIRONMENT\\"
+                        echo \\"Using ENVIRONMENT=$ENVIRONMENT, env_dir=${env_dir}\\"
+
+                        files=( \\"\${env_dir}\\"/values-*.yaml )
+                        if [ \\"\\${#files[@]}\\" -eq 0 ]; then
+                          echo \\"ℹ️ No values-*.yaml found under \${env_dir}; skipping dry run.\\"
+                        else
+                          echo \\"Found values files:\\"
+                          for f in \\"\\${files[@]}\\";
+                          do
+                            echo \\" - \${f}\\"
+                          done
+
+                          for file in \\"\\${files[@]}\\";
+                          do
+                            app=$(basename \\"$file\\" | sed 's/^values-//; s/.yaml$//')
+                            echo \\"Rendering: $app (file: $file)\\"
+                            helm template \\"$app\\" \\"charts/$app\\" -f \\"$file\\" >/dev/null || echo \\"❌ Dry run failed for $app\\"
+                          done
+                        fi
+                      "
                     ''', returnStatus: true)
                 }
             }
@@ -141,7 +156,7 @@ pipeline {
                         trivy config \
                           --severity HIGH,CRITICAL \
                           --include-non-failures \
-                          --helm-kube-version "$KUBE_VERSION" \
+                          --helm-kube-version "${KUBE_VERSION}" \
                           --exit-code 0 \
                           .
                       else
