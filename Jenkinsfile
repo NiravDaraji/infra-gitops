@@ -44,7 +44,11 @@ pipeline {
                     def rc = sh(script: '''
                       command -v yamllint >/dev/null 2>&1 && yamllint -c .yamllint.yaml .
                     ''', returnStatus: true)
-                    if (rc == 0) echo "✅ YAML Lint passed." else echo "❌ YAML Lint reported issues. See details above."
+                    if (rc == 0) {
+                        echo "✅ YAML Lint passed."
+                    } else {
+                        echo "❌ YAML Lint reported issues. See details above."
+                    }
                 }
             }
         }
@@ -80,7 +84,9 @@ pipeline {
                         echo "⚠️ helm not found; skipping unit tests."
                         exit 0
                       fi
+                      # Install plugin if missing (non-blocking)
                       helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
+
                       for chart in charts/*; do
                         if [ -f "$chart/Chart.yaml" ]; then
                           if [ -d "$chart/tests" ]; then
@@ -100,20 +106,22 @@ pipeline {
             steps {
                 script {
                     echo "🧪 Running Helm Template Dry Run..."
+                    // IMPORTANT: Use bash for 'shopt' and ensure variables expand
                     sh(script: '''
                       set +e
                       if ! command -v helm >/dev/null 2>&1; then
                         echo "⚠️ helm not found; skipping dry run."
                         exit 0
                       fi
-                      bash -c '
+
+                      bash -c "
                         shopt -s nullglob
                         for file in environments/${ENVIRONMENT}/values-*.yaml; do
-                          app=$(basename "$file" | sed "s/^values-//; s/.yaml$//")
-                          echo "Rendering: $app"
-                          helm template "$app" "charts/$app" -f "$file" >/dev/null || echo "❌ Dry run failed for $app"
+                          app=$(basename \\"$file\\" | sed 's/^values-//; s/.yaml$//')
+                          echo \\"Rendering: $app\\"
+                          helm template \\"$app\\" \\"charts/$app\\" -f \\"$file\\" >/dev/null || echo \\"❌ Dry run failed for $app\\"
                         done
-                      '
+                      "
                     ''', returnStatus: true)
                 }
             }
@@ -142,17 +150,18 @@ pipeline {
             }
         }
 
-        stage('App status via ArgoCD (optional)') {
+        stage('App status via ArgoCD') {
             steps {
                 script {
-                    echo "📊 Checking app status via ArgoCD (optional)..."
+                    echo "📊 Checking app status via ArgoCD..."
                     sh(script: '''
                       set +e
                       if command -v argocd >/dev/null 2>&1; then
-                        echo "ℹ️  Add argocd login and app wait commands here, e.g.:"
-                        echo "   argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure"
-                        echo "   argocd app list"
-                        echo "   argocd app wait openspeedtest-dev --health --timeout 600"
+                        echo "Logging into ArgoCD..."
+                        argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure || echo "❌ ArgoCD login failed"
+
+                        echo "Listing ArgoCD apps..."
+                        argocd app list || echo "❌ Failed to list apps"
                       else
                         echo "⚠️ ArgoCD CLI not found; skipping."
                       fi
