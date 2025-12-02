@@ -4,6 +4,7 @@ pipeline {
 
     environment {
         KUBE_VERSION = "1.29.0"
+        // Use the Jenkins parameter at runtime; defaults to dev
         ENVIRONMENT  = "${params.environment ?: 'dev'}"
     }
 
@@ -106,7 +107,7 @@ pipeline {
             steps {
                 script {
                     echo "🧪 Running Helm Template Dry Run..."
-                    // IMPORTANT: Use bash for 'shopt' and ensure variables expand
+                    // Force bash so 'shopt' works; use $ENVIRONMENT from shell, not Groovy interpolation.
                     sh(script: '''
                       set +e
                       if ! command -v helm >/dev/null 2>&1; then
@@ -114,14 +115,16 @@ pipeline {
                         exit 0
                       fi
 
-                      bash -c "
+                      bash -lc '
                         shopt -s nullglob
-                        for file in environments/${ENVIRONMENT}/values-*.yaml; do
-                          app=$(basename \\"$file\\" | sed 's/^values-//; s/.yaml$//')
-                          echo \\"Rendering: $app\\"
-                          helm template \\"$app\\" \\"charts/$app\\" -f \\"$file\\" >/dev/null || echo \\"❌ Dry run failed for $app\\"
+                        env_dir="environments/$ENVIRONMENT"
+                        echo "Using ENVIRONMENT=$ENVIRONMENT, env_dir=${env_dir}"
+                        for file in "${env_dir}"/values-*.yaml; do
+                          app=$(basename "$file" | sed "s/^values-//; s/.yaml$//")
+                          echo "Rendering: $app (file: $file)"
+                          helm template "$app" "charts/$app" -f "$file" >/dev/null || echo "❌ Dry run failed for $app"
                         done
-                      "
+                      '
                     ''', returnStatus: true)
                 }
             }
@@ -138,7 +141,7 @@ pipeline {
                         trivy config \
                           --severity HIGH,CRITICAL \
                           --include-non-failures \
-                          --helm-kube-version ${KUBE_VERSION} \
+                          --helm-kube-version "$KUBE_VERSION" \
                           --exit-code 0 \
                           .
                       else
