@@ -119,7 +119,7 @@ pipeline {
                         shopt -s nullglob
                         # Fallback to dev if ENVIRONMENT not set
                         ENVIRONMENT=\\"${ENVIRONMENT:-dev}\\"
-                        env_dir=\\"environments/$ENVIRONMENT\\"
+                        env_dir=environments\$ENVIRONMENT
                         echo \\"Using ENVIRONMENT=$ENVIRONMENT, env_dir=${env_dir}\\"
 
                         files=( \\"\${env_dir}\\"/values-*.yaml )
