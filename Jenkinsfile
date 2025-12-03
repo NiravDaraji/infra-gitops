@@ -103,47 +103,39 @@ pipeline {
             }
         }
 
-        stage('Helm Template Dry Run') {
-            steps {
-                script {
-                    echo "🧪 Running Helm Template Dry Run..."
-                    // Force bash; add fallback for ENVIRONMENT; list matched files; keep non-blocking
-                    sh(script: '''
-                      set +e
-                      if ! command -v helm >/dev/null 2>&1; then
-                        echo "⚠️ helm not found; skipping dry run."
-                        exit 0
-                      fi
+        stage('Helm Template Dry Run For All Charts') {
+        steps {
+            sh '''
+            echo "🔍 Scanning all chart directories..."
 
-                      bash -lc "
-                        shopt -s nullglob
-                        # Fallback to dev if ENVIRONMENT not set
-                        ENVIRONMENT=\\"${ENVIRONMENT:-dev}\\"
-                        env_dir=environments\$ENVIRONMENT
-                        echo \\"Using ENVIRONMENT=$ENVIRONMENT, env_dir=${env_dir}\\"
+            for chartDir in charts/*; do
+                if [ -d "$chartDir" ]; then
+                    chartName=$(basename "$chartDir")
+                    valuesFile="environments/dev/values-${chartName}.yaml"
 
-                        files=( \\"\${env_dir}\\"/values-*.yaml )
-                        if [ \\"\\${#files[@]}\\" -eq 0 ]; then
-                          echo \\"ℹ️ No values-*.yaml found under \${env_dir}; skipping dry run.\\"
-                        else
-                          echo \\"Found values files:\\"
-                          for f in \\"\\${files[@]}\\";
-                          do
-                            echo \\" - \${f}\\"
-                          done
+                    echo "----------------------------------------"
+                    echo "📦 Chart: $chartName"
+                    echo "📁 Path:  $chartDir"
+                    echo "📄 Values: $valuesFile"
+                    echo "----------------------------------------"
 
-                          for file in \\"\\${files[@]}\\";
-                          do
-                            app=$(basename \\"$file\\" | sed 's/^values-//; s/.yaml$//')
-                            echo \\"Rendering: $app (file: $file)\\"
-                            helm template \\"$app\\" \\"charts/$app\\" -f \\"$file\\" >/dev/null || echo \\"❌ Dry run failed for $app\\"
-                          done
-                        fi
-                      "
-                    ''', returnStatus: true)
-                }
-            }
+                    if [ ! -f "$valuesFile" ]; then
+                        echo "❌ Values file not found: $valuesFile"
+                        exit 1
+                    fi
+
+                    echo "Running: helm template $chartName $chartDir --values $valuesFile --debug"
+
+                    helm template "$chartName" "$chartDir" \
+                        --values "$valuesFile" \
+                        --debug || exit 1
+
+                    echo "✅ Helm dry-run successful for: $chartName"
+                fi
+            done
+            '''
         }
+    }
 
         stage('Trivy Security Scan (config, optional)') {
             steps {
