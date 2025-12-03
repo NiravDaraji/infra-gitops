@@ -113,22 +113,19 @@ pipeline {
                     chartName=$(basename "$chartDir")
                     valuesFile="environments/dev/values-${chartName}.yaml"
 
-                    echo "----------------------------------------"
                     echo "📦 Chart: $chartName"
                     echo "📁 Path:  $chartDir"
                     echo "📄 Values: $valuesFile"
-                    echo "----------------------------------------"
 
                     if [ ! -f "$valuesFile" ]; then
                         echo "❌ Values file not found: $valuesFile"
                         exit 1
                     fi
 
-                    echo "Running: helm template $chartName $chartDir --values $valuesFile --debug"
+                    echo "Running: helm template $chartName $chartDir --values $valuesFile"
 
                     helm template "$chartName" "$chartDir" \
-                        --values "$valuesFile" \
-                        --debug || exit 1
+                        --values "$valuesFile" || exit 1
 
                     echo "✅ Helm dry-run successful for: $chartName"
                 fi
