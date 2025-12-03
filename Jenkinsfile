@@ -4,7 +4,6 @@ pipeline {
 
     environment {
         KUBE_VERSION = "1.29.0"
-        // Default ENVIRONMENT from parameter; if not passed, we still guard in shell
         ENVIRONMENT  = "${params.environment ?: 'dev'}"
     }
 
@@ -19,21 +18,37 @@ pipeline {
             }
         }
 
-        stage('Tool sanity check') {
+        stage('Install Missing Tools') {
             steps {
                 script {
-                    echo "🔎 Checking tool availability..."
-                    sh(script: '''
-                      set +e
+                    echo "🔎 Checking and installing required tools..."
+                    sh '''
+                      set -e
                       for t in helm yamllint trivy argocd; do
                         if command -v "$t" >/dev/null 2>&1; then
                           echo "✅ $t found at: $(command -v $t)"
                           $t --version 2>/dev/null || true
                         else
-                          echo "⚠️  $t not found in PATH"
+                          echo "⚠️ $t not found. Installing..."
+                          case "$t" in
+                            helm)
+                              curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+                              ;;
+                            yamllint)
+                              apt update && apt install -y yamllint
+                              ;;
+                            trivy)
+                              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+                              ;;
+                            argocd)
+                              curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                              chmod +x /usr/local/bin/argocd
+                              ;;
+                          esac
+                          echo "✅ $t installed successfully."
                         fi
                       done
-                    ''', returnStatus: true)
+                    '''
                 }
             }
         }
@@ -43,7 +58,7 @@ pipeline {
                 script {
                     echo "🧪 Running YAML Lint..."
                     def rc = sh(script: '''
-                      command -v yamllint >/dev/null 2>&1 && yamllint -c .yamllint.yaml .
+                      yamllint -c .yamllint.yaml environments/dev/
                     ''', returnStatus: true)
                     if (rc == 0) {
                         echo "✅ YAML Lint passed."
@@ -60,10 +75,6 @@ pipeline {
                     echo "🧪 Running Helm Lint..."
                     sh(script: '''
                       set +e
-                      if ! command -v helm >/dev/null 2>&1; then
-                        echo "⚠️ helm not found; skipping."
-                        exit 0
-                      fi
                       for chart in charts/*; do
                         if [ -f "$chart/Chart.yaml" ]; then
                           echo "Linting $chart..."
@@ -81,20 +92,14 @@ pipeline {
                     echo "🧪 Running Helm Unit Tests..."
                     sh(script: '''
                       set +e
-                      if ! command -v helm >/dev/null 2>&1; then
-                        echo "⚠️ helm not found; skipping unit tests."
-                        exit 0
-                      fi
-                      # Install plugin if missing (non-blocking)
                       helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
-
                       for chart in charts/*; do
                         if [ -f "$chart/Chart.yaml" ]; then
                           if [ -d "$chart/tests" ]; then
                             echo "Running unit tests for: $chart"
                             helm unittest "$chart" --color || echo "❌ Unit tests failed for $chart"
                           else
-                            echo "ℹ️  No tests folder for: $chart – skipping."
+                            echo "ℹ️ No tests folder for: $chart – skipping."
                           fi
                         fi
                       done
@@ -104,55 +109,46 @@ pipeline {
         }
 
         stage('Helm Template Dry Run For All Charts') {
-        steps {
-            sh '''
-            echo "🔍 Scanning all chart directories..."
+            steps {
+                sh '''
+                  echo "🔍 Scanning all chart directories..."
+                  for chartDir in charts/*; do
+                      if [ -d "$chartDir" ]; then
+                          chartName=$(basename "$chartDir")
+                          valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
 
-            for chartDir in charts/*; do
-                if [ -d "$chartDir" ]; then
-                    chartName=$(basename "$chartDir")
-                    valuesFile="environments/dev/values-${chartName}.yaml"
+                          echo "📦 Chart: $chartName"
+                          echo "📁 Path:  $chartDir"
+                          echo "📄 Values: $valuesFile"
 
-                    echo "📦 Chart: $chartName"
-                    echo "📁 Path:  $chartDir"
-                    echo "📄 Values: $valuesFile"
+                          if [ ! -f "$valuesFile" ]; then
+                              echo "❌ Values file not found: $valuesFile"
+                              exit 1
+                          fi
 
-                    if [ ! -f "$valuesFile" ]; then
-                        echo "❌ Values file not found: $valuesFile"
-                        exit 1
-                    fi
-
-                    echo "Running: helm template $chartName $chartDir --values $valuesFile"
-
-                    helm template "$chartName" "$chartDir" \
-                        --values "$valuesFile" || exit 1
-
-                    echo "✅ Helm dry-run successful for: $chartName"
-                fi
-            done
-            '''
+                          echo "Running: helm template $chartName $chartDir --values $valuesFile"
+                          helm template "$chartName" "$chartDir" --values "$valuesFile" || exit 1
+                          echo "✅ Helm dry-run successful for: $chartName"
+                      fi
+                  done
+                '''
+            }
         }
-    }
 
         stage('Trivy Security Scan (config, optional)') {
             steps {
                 script {
-                    echo "🔐 Running Trivy Security Scan (config/misconfigs)..."
+                    echo "🔐 Running Trivy Security Scan..."
                     sh(script: '''
                       set +e
-                      if command -v trivy >/dev/null 2>&1; then
-                        echo "▶ trivy version: $(trivy --version | head -n 1)"
-                        trivy config \
-                          --severity HIGH,CRITICAL \
-                          --include-non-failures \
-                          --helm-kube-version "${KUBE_VERSION}" \
-                          --exit-code 0 \
-                          .
-                      else
-                        echo "⚠️ Trivy not found; skipping security scan."
-                      fi
+                      trivy config \
+                        --severity HIGH,CRITICAL \
+                        --include-non-failures \
+                        --helm-kube-version "${KUBE_VERSION}" \
+                        --exit-code 0 \
+                        .
                     ''', returnStatus: true)
-                    echo "✅ Trivy step completed (scan may have findings; review console output)."
+                    echo "✅ Trivy step completed."
                 }
             }
         }
@@ -163,15 +159,8 @@ pipeline {
                     echo "📊 Checking app status via ArgoCD..."
                     sh(script: '''
                       set +e
-                      if command -v argocd >/dev/null 2>&1; then
-                        echo "Logging into ArgoCD..."
-                        argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure || echo "❌ ArgoCD login failed"
-
-                        echo "Listing ArgoCD apps..."
-                        argocd app list || echo "❌ Failed to list apps"
-                      else
-                        echo "⚠️ ArgoCD CLI not found; skipping."
-                      fi
+                      argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure || echo "❌ ArgoCD login failed"
+                      argocd app list || echo "❌ Failed to list apps"
                     ''', returnStatus: true)
                 }
             }
