@@ -108,32 +108,36 @@ pipeline {
             }
         }
 
-        stage('Helm Template Dry Run For All Charts') {
-            steps {
-                sh '''
-                  echo "🔍 Scanning all chart directories..."
-                  for chartDir in charts/*; do
-                      if [ -d "$chartDir" ]; then
-                          chartName=$(basename "$chartDir")
-                          valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
+         stage('Helm Template Dry Run For All Charts') {
+        steps {
+            sh '''
+            echo "🔍 Scanning all chart directories..."
 
-                          echo "📦 Chart: $chartName"
-                          echo "📁 Path:  $chartDir"
-                          echo "📄 Values: $valuesFile"
+            for chartDir in charts/*; do
+                if [ -d "$chartDir" ]; then
+                    chartName=$(basename "$chartDir")
+                    valuesFile="environments/dev/values-${chartName}.yaml"
 
-                          if [ ! -f "$valuesFile" ]; then
-                              echo "❌ Values file not found: $valuesFile"
-                              exit 1
-                          fi
+                    echo "📦 Chart: $chartName"
+                    echo "📁 Path:  $chartDir"
+                    echo "📄 Values: $valuesFile"
 
-                          echo "Running: helm template $chartName $chartDir --values $valuesFile"
-                          helm template "$chartName" "$chartDir" --values "$valuesFile" || exit 1
-                          echo "✅ Helm dry-run successful for: $chartName"
-                      fi
-                  done
-                '''
-            }
+                    if [ ! -f "$valuesFile" ]; then
+                        echo "❌ Values file not found: $valuesFile"
+                        exit 1
+                    fi
+
+                    echo "Running: helm template $chartName $chartDir --values $valuesFile"
+
+                    helm template "$chartName" "$chartDir" \
+                        --values "$valuesFile" || exit 1
+
+                    echo "✅ Helm dry-run successful for: $chartName"
+                fi
+            done
+            '''
         }
+    }
 
         stage('Trivy Security Scan (config, optional)') {
             steps {
