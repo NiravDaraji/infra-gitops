@@ -1,15 +1,16 @@
+
 extends: default
 
 rules:
-  document-start: disable     
-  line-length: disable        
-  truthy: disable             
-  comments: disable           
+  document-start: disable
+  line-length: disable
+  truthy: disable
+  comments: disable
   indentation:
     spaces: 2
     indent-sequences: false
     level: warning
-  trailing-spaces: enable
+  trailing-spaces:
     level: warning
   new-lines:
     type: unix
@@ -18,9 +19,8 @@ rules:
   empty-lines: disable
 
 ignore:
-  - charts/**
-  - environments/**      # Ignore environment override files
-  - .github/**           # Ignore CI/CD workflows
-  - charts/**/tests/**   # Ignore helm-unittest YAML files (not templates)
-  - charts/**/index.yaml # Ignore repository index
-  - "**/*.tpl"           # Ignore helper template functions
+  - charts/**                  # Ignore all Helm chart files
+  - .github/**                 # Ignore CI/CD workflows
+  - charts/**/tests/**         # Ignore helm-unittest YAML files
+  - charts/**/index.yaml       # Ignore repository index
+  - "**/*.tpl"                 # Ignore helper template functions
