@@ -3,7 +3,6 @@ pipeline {
     agent any
 
     environment {
-        KUBE_VERSION = "1.29.0"
         ENVIRONMENT  = "${params.environment ?: 'dev'}"
     }
 
@@ -148,7 +147,6 @@ pipeline {
                       trivy config \
                         --severity HIGH,CRITICAL \
                         --include-non-failures \
-                        --helm-kube-version "${KUBE_VERSION}" \
                         --exit-code 0 \
                         .
                     ''', returnStatus: true)
