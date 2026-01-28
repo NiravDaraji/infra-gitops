@@ -1,0 +1,26 @@
+
+extends: default
+
+rules:
+  document-start: disable
+  line-length: disable
+  truthy: disable
+  comments: disable
+  indentation:
+    spaces: 2
+    indent-sequences: false
+    level: warning
+  trailing-spaces:
+    level: warning
+  new-lines:
+    type: unix
+  empty-values: disable
+  key-duplicates: disable
+  empty-lines: disable
+
+ignore:
+  - charts/**                  # Ignore all Helm chart files
+  - .github/**                 # Ignore CI/CD workflows
+  - charts/**/tests/**         # Ignore helm-unittest YAML files
+  - charts/**/index.yaml       # Ignore repository index
+  - "**/*.tpl"                 # Ignore helper template functions
