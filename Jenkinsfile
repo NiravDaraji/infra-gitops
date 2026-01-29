@@ -1,9 +1,9 @@
-
 pipeline {
     agent any
 
     environment {
-        ENVIRONMENT  = "${params.environment ?: 'dev'}"
+        ENVIRONMENT         = "${params.environment ?: 'dev'}"
+        PROMOTION_ELIGIBLE  = "false"
     }
 
     parameters {
@@ -11,6 +11,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'dev', url: 'https://github.com/NiravDaraji/infra-gitops.git'
@@ -56,128 +57,137 @@ pipeline {
             steps {
                 script {
                     echo "Running YAML Lint..."
-                    def rc = sh(script: '''
-                      yamllint -c .yamllint.yaml environments/dev/
-                    ''', returnStatus: true)
-                    if (rc == 0) {
-                        echo "YAML Lint passed."
-                    } else {
-                        echo "YAML Lint reported issues. See details above."
-                    }
+                    sh 'yamllint -c .yamllint.yaml environments/dev/'
                 }
             }
         }
 
         stage('Helm Lint') {
             steps {
-                script {
-                    echo "Running Helm Lint..."
-                    sh(script: '''
-                      set +e
-                      for chart in charts/*; do
-                        if [ -f "$chart/Chart.yaml" ]; then
-                          echo "Linting $chart..."
-                          helm lint "$chart" || echo "Helm lint failed for $chart"
-                        fi
-                      done
-                    ''', returnStatus: true)
-                }
+                sh '''
+                  for chart in charts/*; do
+                    if [ -f "$chart/Chart.yaml" ]; then
+                      echo "Linting $chart..."
+                      helm lint "$chart"
+                    fi
+                  done
+                '''
             }
         }
 
         stage('Helm Unit Tests') {
             steps {
-                script {
-                    echo "Running Helm Unit Tests..."
-                    sh(script: '''
-                      set +e
-                      helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
-                      for chart in charts/*; do
-                        if [ -f "$chart/Chart.yaml" ]; then
-                          if [ -d "$chart/tests" ]; then
-                            echo "Running unit tests for: $chart"
-                            helm unittest "$chart" || echo "Unit tests failed for $chart"
-                          else
-                            echo "No tests folder for: $chart – skipping."
-                          fi
-                        fi
-                      done
-                    ''', returnStatus: true)
-                }
+                sh '''
+                  helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
+                  for chart in charts/*; do
+                    if [ -f "$chart/Chart.yaml" ] && [ -d "$chart/tests" ]; then
+                      echo "Running unit tests for: $chart"
+                      helm unittest "$chart"
+                    fi
+                  done
+                '''
             }
         }
 
-         stage('Helm Template Dry Run For All Charts') {
-        steps {
-            sh '''
-            echo "Scanning all chart directories..."
-
-            for chartDir in charts/*; do
-                if [ -d "$chartDir" ]; then
+        stage('Helm Template Dry Run For All Charts') {
+            steps {
+                sh '''
+                for chartDir in charts/*; do
                     chartName=$(basename "$chartDir")
                     valuesFile="environments/dev/values-${chartName}.yaml"
 
-                    echo "Chart: $chartName"
-                    echo "Path:  $chartDir"
-                    echo "Values: $valuesFile"
+                    echo "Running helm template for $chartName"
 
                     if [ ! -f "$valuesFile" ]; then
-                        echo "Values file not found: $valuesFile"
+                        echo "❌ Missing values file: $valuesFile"
                         exit 1
                     fi
 
-                    echo "Running: helm template $chartName $chartDir --values $valuesFile"
-
                     helm template "$chartName" "$chartDir" \
-                        --values "$valuesFile" || exit 1
-
-                    echo "Helm dry-run successful for: $chartName"
-                fi
-            done
-            '''
-        }
-    }
-
-        stage('Trivy Security Scan (config, optional)') {
-            steps {
-                script {
-                    echo "Running Trivy Security Scan..."
-                    sh(script: '''
-                      set +e
-                      trivy config \
-                        --severity HIGH,CRITICAL \
-                        --include-non-failures \
-                        --exit-code 0 \
-                        .
-                    ''', returnStatus: true)
-                    echo "Trivy step completed."
-                }
+                        --values "$valuesFile"
+                done
+                '''
             }
         }
 
-        stage('App status via ArgoCD') {
+        stage('Trivy Security Scan (config, optional)') {
             steps {
-                script {
-                    echo "Checking app status via ArgoCD..."
-                    sh(script: '''
-                      set +e
-                      argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure || echo "❌ ArgoCD login failed"
-                      argocd app list || echo "Failed to list apps"
-                    ''', returnStatus: true)
-                }
+                sh '''
+                  trivy config \
+                    --severity HIGH,CRITICAL \
+                    --include-non-failures \
+                    --exit-code 0 \
+                    .
+                '''
+            }
+        }
+
+        stage('App Status via ArgoCD') {
+            steps {
+                sh '''
+                  argocd login 10.139.9.158:31181 \
+                    --username admin \
+                    --password Admin@1234 \
+                    --insecure
+
+                  argocd app list
+                '''
             }
         }
 
         stage('SDLC Summary') {
             steps {
-                echo "SDLC validation completed. Review console logs for errors and warnings."
+                script {
+                    echo "========================================="
+                    echo " SDLC WORKFLOW STATUS : PASSED"
+                    echo "========================================="
+                    echo "✔ YAML Validation"
+                    echo "✔ Helm Lint"
+                    echo "✔ Helm Unit Tests"
+                    echo "✔ Helm Template Dry Run"
+                    echo "✔ Trivy Security Scan (Optional)"
+                    echo "✔ ArgoCD Application Status Check"
+                    echo "-----------------------------------------"
+                    echo "Your SDLC workflow is validated."
+                    echo "You are eligible to promote this build to STAGING."
+                    echo "========================================="
+
+                    env.PROMOTION_ELIGIBLE = "true"
+                }
+            }
+        }
+
+        stage('Promotion Approval') {
+            when {
+                expression { env.PROMOTION_ELIGIBLE == "true" }
+            }
+            steps {
+                input message: 'SDLC validated successfully. Do you want to promote this build to STAGING?',
+                      ok: 'Yes, Promote'
+            }
+        }
+
+        stage('Trigger Promotion Workflow') {
+            when {
+                expression { env.PROMOTION_ELIGIBLE == "true" }
+            }
+            steps {
+                echo "Promotion approved."
+                echo "Triggering DEV → STAGING promotion workflow..."
+                echo "Here Jenkins/GitHub Action will sync tested values to staging branch."
             }
         }
     }
 
     post {
-        always {
-            echo "Pipeline finished successfully (with possible warnings/errors)."
+        success {
+            echo "Pipeline completed successfully."
+        }
+        aborted {
+            echo "Pipeline aborted by user during promotion approval."
+        }
+        failure {
+            echo "Pipeline failed. Promotion not allowed."
         }
     }
 }
