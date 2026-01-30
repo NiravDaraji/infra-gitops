@@ -41,7 +41,7 @@ jobs:
         uses: ibiqlik/action-yamllint@v3
         with:
           config_file: .yamllint.yaml
-        continue-on-error: true
+        continue-on-error: false
 
       # 4. Helm Lint
       - name: Helm Lint
