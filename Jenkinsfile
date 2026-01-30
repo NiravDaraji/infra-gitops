@@ -7,7 +7,11 @@ pipeline {
     }
 
     parameters {
-        string(name: 'environment', defaultValue: 'dev', description: 'Environment to validate (e.g., dev)')
+        string(
+            name: 'environment',
+            defaultValue: 'dev',
+            description: 'Environment to validate (e.g. dev)'
+        )
     }
 
     stages {
@@ -41,7 +45,8 @@ pipeline {
                               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
                               ;;
                             argocd)
-                              curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                              curl -sSL -o /usr/local/bin/argocd \
+                                https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
                               chmod +x /usr/local/bin/argocd
                               ;;
                           esac
@@ -55,22 +60,28 @@ pipeline {
 
         stage('YAML Lint') {
             steps {
-                script {
-                    echo "Running YAML Lint..."
-                    sh 'yamllint -c .yamllint.yaml environments/dev/'
-                }
+                echo "Running YAML lint..."
+                sh 'yamllint -c .yamllint.yaml environments/dev/'
             }
         }
 
         stage('Helm Lint') {
             steps {
                 sh '''
+                  set -e
+
+                  echo "Starting Helm lint validation..."
+
                   for chart in charts/*; do
                     if [ -f "$chart/Chart.yaml" ]; then
-                      echo "Linting $chart..."
+                      echo "-----------------------------------------"
+                      echo "Linting chart: $chart"
                       helm lint "$chart"
                     fi
                   done
+
+                  echo "-----------------------------------------"
+                  echo "Helm lint validation PASSED for all charts."
                 '''
             }
         }
@@ -78,7 +89,9 @@ pipeline {
         stage('Helm Unit Tests') {
             steps {
                 sh '''
+                  set -e
                   helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
+
                   for chart in charts/*; do
                     if [ -f "$chart/Chart.yaml" ] && [ -d "$chart/tests" ]; then
                       echo "Running unit tests for: $chart"
@@ -92,20 +105,25 @@ pipeline {
         stage('Helm Template Dry Run For All Charts') {
             steps {
                 sh '''
-                for chartDir in charts/*; do
+                  set -e
+
+                  for chartDir in charts/*; do
                     chartName=$(basename "$chartDir")
                     valuesFile="environments/dev/values-${chartName}.yaml"
 
-                    echo "Running helm template for $chartName"
+                    echo "-----------------------------------------"
+                    echo "Running helm template for: $chartName"
 
                     if [ ! -f "$valuesFile" ]; then
-                        echo "❌ Missing values file: $valuesFile"
-                        exit 1
+                      echo "Missing values file: $valuesFile"
+                      exit 1
                     fi
 
                     helm template "$chartName" "$chartDir" \
-                        --values "$valuesFile"
-                done
+                      --values "$valuesFile"
+                  done
+
+                  echo "Helm template dry-run completed successfully."
                 '''
             }
         }
@@ -113,6 +131,8 @@ pipeline {
         stage('Trivy Security Scan (config, optional)') {
             steps {
                 sh '''
+                  echo "Running Trivy config scan (non-blocking)..."
+
                   trivy config \
                     --severity HIGH,CRITICAL \
                     --include-non-failures \
@@ -125,6 +145,8 @@ pipeline {
         stage('App Status via ArgoCD') {
             steps {
                 sh '''
+                  echo "Checking ArgoCD application status..."
+
                   argocd login 10.139.9.158:31181 \
                     --username admin \
                     --password Admin@1234 \
@@ -142,7 +164,7 @@ pipeline {
                     echo " SDLC WORKFLOW STATUS : PASSED"
                     echo "========================================="
                     echo "✔ YAML Validation"
-                    echo "✔ Helm Lint"
+                    echo "✔ Helm Lint (Hard Gate)"
                     echo "✔ Helm Unit Tests"
                     echo "✔ Helm Template Dry Run"
                     echo "✔ Trivy Security Scan (Optional)"
@@ -162,8 +184,10 @@ pipeline {
                 expression { env.PROMOTION_ELIGIBLE == "true" }
             }
             steps {
-                input message: 'SDLC validated successfully. Do you want to promote this build to STAGING?',
-                      ok: 'Yes, Promote'
+                input(
+                    message: 'SDLC validated successfully. Do you want to promote this build to STAGING?',
+                    ok: 'Yes, Promote'
+                )
             }
         }
 
@@ -174,7 +198,7 @@ pipeline {
             steps {
                 echo "Promotion approved."
                 echo "Triggering DEV → STAGING promotion workflow..."
-                echo "Here Jenkins/GitHub Action will sync tested values to staging branch."
+                echo "GitHub Actions / GitOps pipeline will handle deployment."
             }
         }
     }
