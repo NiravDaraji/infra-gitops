@@ -159,8 +159,7 @@ Pipeline stopped at: Helm Lint stage.
                         error """
 ❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
 
-Helm template rendering failed.
-This usually indicates invalid values, templates, or chart configuration.
+Helm template failed.
 
 Pipeline stopped at: Helm Template Dry Run stage.
 """
@@ -238,8 +237,8 @@ Pipeline stopped at: Helm Template Dry Run stage.
             }
             steps {
                 echo "Promotion approved."
-                echo "Triggering DEV → STAGING promotion workflow..."
-                echo "GitHub Actions / GitOps pipeline will handle deployment."
+                echo "Triggering DEV to STAGING promotion workflow..."
+                echo "GitHub Actions pipeline handles deployment."
             }
         }
     }
