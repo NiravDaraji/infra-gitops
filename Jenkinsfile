@@ -58,31 +58,58 @@ pipeline {
             }
         }
 
+        /* ================= YAML LINT ================= */
         stage('YAML Lint') {
             steps {
-                echo "Running YAML lint..."
-                sh 'yamllint -c .yamllint.yaml environments/dev/'
+                script {
+                    try {
+                        echo "Running YAML lint..."
+                        sh 'yamllint -c .yamllint.yaml environments/dev/'
+                    } catch (err) {
+                        error """
+❌ SDLC FAILED: YAML LINT ERROR
+
+One or more YAML files contain syntax or formatting issues.
+Check the yamllint output above and fix the errors.
+
+Pipeline stopped at: YAML Validation stage.
+"""
+                    }
+                }
             }
         }
 
+        /* ================= HELM LINT ================= */
         stage('Helm Lint') {
             steps {
-                sh '''
-                  set -e
+                script {
+                    try {
+                        sh '''
+                          set -e
+                          echo "Starting Helm lint validation..."
 
-                  echo "Starting Helm lint validation..."
+                          for chart in charts/*; do
+                            if [ -f "$chart/Chart.yaml" ]; then
+                              echo "-----------------------------------------"
+                              echo "Linting chart: $chart"
+                              helm lint "$chart"
+                            fi
+                          done
 
-                  for chart in charts/*; do
-                    if [ -f "$chart/Chart.yaml" ]; then
-                      echo "-----------------------------------------"
-                      echo "Linting chart: $chart"
-                      helm lint "$chart"
-                    fi
-                  done
+                          echo "-----------------------------------------"
+                          echo "Helm lint validation PASSED for all charts."
+                        '''
+                    } catch (err) {
+                        error """
+❌ SDLC FAILED: HELM LINT ERROR
 
-                  echo "-----------------------------------------"
-                  echo "Helm lint validation PASSED for all charts."
-                '''
+Helm chart validation failed.
+Fix Helm chart issues before proceeding.
+
+Pipeline stopped at: Helm Lint stage.
+"""
+                    }
+                }
             }
         }
 
@@ -102,29 +129,43 @@ pipeline {
             }
         }
 
+        /* ============ HELM TEMPLATE DRY RUN ============ */
         stage('Helm Template Dry Run For All Charts') {
             steps {
-                sh '''
-                  set -e
+                script {
+                    try {
+                        sh '''
+                          set -e
 
-                  for chartDir in charts/*; do
-                    chartName=$(basename "$chartDir")
-                    valuesFile="environments/dev/values-${chartName}.yaml"
+                          for chartDir in charts/*; do
+                            chartName=$(basename "$chartDir")
+                            valuesFile="environments/dev/values-${chartName}.yaml"
 
-                    echo "-----------------------------------------"
-                    echo "Running helm template for: $chartName"
+                            echo "-----------------------------------------"
+                            echo "Running helm template for: $chartName"
 
-                    if [ ! -f "$valuesFile" ]; then
-                      echo "Missing values file: $valuesFile"
-                      exit 1
-                    fi
+                            if [ ! -f "$valuesFile" ]; then
+                              echo "❌ Missing values file: $valuesFile"
+                              exit 1
+                            fi
 
-                    helm template "$chartName" "$chartDir" \
-                      --values "$valuesFile"
-                  done
+                            helm template "$chartName" "$chartDir" \
+                              --values "$valuesFile"
+                          done
 
-                  echo "Helm template dry-run completed successfully."
-                '''
+                          echo "Helm template dry-run completed successfully."
+                        '''
+                    } catch (err) {
+                        error """
+❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
+
+Helm template rendering failed.
+This usually indicates invalid values, templates, or chart configuration.
+
+Pipeline stopped at: Helm Template Dry Run stage.
+"""
+                    }
+                }
             }
         }
 
