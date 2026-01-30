@@ -1,16 +1,21 @@
-
 pipeline {
     agent any
 
     environment {
-        ENVIRONMENT  = "${params.environment ?: 'dev'}"
+        ENVIRONMENT         = "${params.environment ?: 'dev'}"
+        PROMOTION_ELIGIBLE  = "false"
     }
 
     parameters {
-        string(name: 'environment', defaultValue: 'dev', description: 'Environment to validate (e.g., dev)')
+        string(
+            name: 'environment',
+            defaultValue: 'dev',
+            description: 'Environment to validate (e.g. dev)'
+        )
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'dev', url: 'https://github.com/NiravDaraji/infra-gitops.git'
@@ -40,7 +45,8 @@ pipeline {
                               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
                               ;;
                             argocd)
-                              curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                              curl -sSL -o /usr/local/bin/argocd \
+                                https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
                               chmod +x /usr/local/bin/argocd
                               ;;
                           esac
@@ -52,132 +58,200 @@ pipeline {
             }
         }
 
+        /* ================= YAML LINT ================= */
         stage('YAML Lint') {
             steps {
                 script {
-                    echo "Running YAML Lint..."
-                    def rc = sh(script: '''
-                      yamllint -c .yamllint.yaml environments/dev/
-                    ''', returnStatus: true)
-                    if (rc == 0) {
-                        echo "YAML Lint passed."
-                    } else {
-                        echo "YAML Lint reported issues. See details above."
+                    try {
+                        echo "Running YAML lint..."
+                        sh 'yamllint -c .yamllint.yaml environments/dev/'
+                    } catch (err) {
+                        error """
+❌ SDLC FAILED: YAML LINT ERROR
+
+One or more YAML files contain syntax or formatting issues.
+Check the yamllint output above and fix the errors.
+
+Pipeline stopped at: YAML Validation stage.
+"""
                     }
                 }
             }
         }
 
+        /* ================= HELM LINT ================= */
         stage('Helm Lint') {
             steps {
                 script {
-                    echo "Running Helm Lint..."
-                    sh(script: '''
-                      set +e
-                      for chart in charts/*; do
-                        if [ -f "$chart/Chart.yaml" ]; then
-                          echo "Linting $chart..."
-                          helm lint "$chart" || echo "Helm lint failed for $chart"
-                        fi
-                      done
-                    ''', returnStatus: true)
+                    try {
+                        sh '''
+                          set -e
+                          echo "Starting Helm lint validation..."
+
+                          for chart in charts/*; do
+                            if [ -f "$chart/Chart.yaml" ]; then
+                              echo "-----------------------------------------"
+                              echo "Linting chart: $chart"
+                              helm lint "$chart"
+                            fi
+                          done
+
+                          echo "-----------------------------------------"
+                          echo "Helm lint validation PASSED for all charts."
+                        '''
+                    } catch (err) {
+                        error """
+❌ SDLC FAILED: HELM LINT ERROR
+
+Helm chart validation failed.
+Fix Helm chart issues before proceeding.
+
+Pipeline stopped at: Helm Lint stage.
+"""
+                    }
                 }
             }
         }
 
         stage('Helm Unit Tests') {
             steps {
-                script {
-                    echo "Running Helm Unit Tests..."
-                    sh(script: '''
-                      set +e
-                      helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
-                      for chart in charts/*; do
-                        if [ -f "$chart/Chart.yaml" ]; then
-                          if [ -d "$chart/tests" ]; then
-                            echo "Running unit tests for: $chart"
-                            helm unittest "$chart" || echo "Unit tests failed for $chart"
-                          else
-                            echo "No tests folder for: $chart – skipping."
-                          fi
-                        fi
-                      done
-                    ''', returnStatus: true)
-                }
+                sh '''
+                  set -e
+                  helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
+
+                  for chart in charts/*; do
+                    if [ -f "$chart/Chart.yaml" ] && [ -d "$chart/tests" ]; then
+                      echo "Running unit tests for: $chart"
+                      helm unittest "$chart"
+                    fi
+                  done
+                '''
             }
         }
 
-         stage('Helm Template Dry Run For All Charts') {
-        steps {
-            sh '''
-            echo "Scanning all chart directories..."
+        /* ============ HELM TEMPLATE DRY RUN ============ */
+        stage('Helm Template Dry Run For All Charts') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                          set -e
 
-            for chartDir in charts/*; do
-                if [ -d "$chartDir" ]; then
-                    chartName=$(basename "$chartDir")
-                    valuesFile="environments/dev/values-${chartName}.yaml"
+                          for chartDir in charts/*; do
+                            chartName=$(basename "$chartDir")
+                            valuesFile="environments/dev/values-${chartName}.yaml"
 
-                    echo "Chart: $chartName"
-                    echo "Path:  $chartDir"
-                    echo "Values: $valuesFile"
+                            echo "-----------------------------------------"
+                            echo "Running helm template for: $chartName"
 
-                    if [ ! -f "$valuesFile" ]; then
-                        echo "Values file not found: $valuesFile"
-                        exit 1
-                    fi
+                            if [ ! -f "$valuesFile" ]; then
+                              echo "❌ Missing values file: $valuesFile"
+                              exit 1
+                            fi
 
-                    echo "Running: helm template $chartName $chartDir --values $valuesFile"
+                            helm template "$chartName" "$chartDir" \
+                              --values "$valuesFile"
+                          done
 
-                    helm template "$chartName" "$chartDir" \
-                        --values "$valuesFile" || exit 1
+                          echo "Helm template dry-run completed successfully."
+                        '''
+                    } catch (err) {
+                        error """
+❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
 
-                    echo "Helm dry-run successful for: $chartName"
-                fi
-            done
-            '''
+Helm template failed.
+
+Pipeline stopped at: Helm Template Dry Run stage.
+"""
+                    }
+                }
+            }
         }
-    }
 
         stage('Trivy Security Scan (config, optional)') {
             steps {
-                script {
-                    echo "Running Trivy Security Scan..."
-                    sh(script: '''
-                      set +e
-                      trivy config \
-                        --severity HIGH,CRITICAL \
-                        --include-non-failures \
-                        --exit-code 0 \
-                        .
-                    ''', returnStatus: true)
-                    echo "Trivy step completed."
-                }
+                sh '''
+                  echo "Running Trivy config scan (non-blocking)..."
+
+                  trivy config \
+                    --severity HIGH,CRITICAL \
+                    --include-non-failures \
+                    --exit-code 0 \
+                    .
+                '''
             }
         }
 
-        stage('App status via ArgoCD') {
+        stage('App Status via ArgoCD') {
             steps {
-                script {
-                    echo "Checking app status via ArgoCD..."
-                    sh(script: '''
-                      set +e
-                      argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure || echo "❌ ArgoCD login failed"
-                      argocd app list || echo "Failed to list apps"
-                    ''', returnStatus: true)
-                }
+                sh '''
+                  echo "Checking ArgoCD application status..."
+
+                  argocd login 10.139.9.158:31181 \
+                    --username admin \
+                    --password Admin@1234 \
+                    --insecure
+
+                  argocd app list
+                '''
             }
         }
 
         stage('SDLC Summary') {
             steps {
-                echo "SDLC validation completed. Review console logs for errors and warnings."
+                script {
+                    echo "========================================="
+                    echo " SDLC WORKFLOW STATUS : PASSED"
+                    echo "========================================="
+                    echo "✔ YAML Validation"
+                    echo "✔ Helm Lint (Hard Gate)"
+                    echo "✔ Helm Unit Tests"
+                    echo "✔ Helm Template Dry Run"
+                    echo "✔ Trivy Security Scan (Optional)"
+                    echo "✔ ArgoCD Application Status Check"
+                    echo "-----------------------------------------"
+                    echo "Your SDLC workflow is validated."
+                    echo "You are eligible to promote this build to STAGING."
+                    echo "========================================="
+
+                    env.PROMOTION_ELIGIBLE = "true"
+                }
+            }
+        }
+
+        stage('Promotion Approval') {
+            when {
+                expression { env.PROMOTION_ELIGIBLE == "true" }
+            }
+            steps {
+                input(
+                    message: 'SDLC validated successfully. Do you want to promote this build to STAGING?',
+                    ok: 'Yes, Promote'
+                )
+            }
+        }
+
+        stage('Trigger Promotion Workflow') {
+            when {
+                expression { env.PROMOTION_ELIGIBLE == "true" }
+            }
+            steps {
+                echo "Promotion approved."
+                echo "Triggering DEV to STAGING promotion workflow..."
+                echo "GitHub Actions pipeline handles deployment."
             }
         }
     }
 
     post {
-        always {
-            echo "Pipeline finished successfully (with possible warnings/errors)."
+        success {
+            echo "Pipeline completed successfully."
+        }
+        aborted {
+            echo "Pipeline aborted by user during promotion approval."
+        }
+        failure {
+            echo "Pipeline failed. Promotion not allowed."
         }
     }
 }
