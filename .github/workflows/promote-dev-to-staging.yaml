@@ -28,8 +28,12 @@ jobs:
       - name: Copy values-openspeedtest.yaml from dev to staging
         run: |
           cp environments/dev/values-openspeedtest.yaml environments/staging/values-openspeedtest.yaml
-          git add environments/staging/values-openspeedtest.yaml
-          git commit -m "Sync values.yaml from dev to staging"
-
+          git add environments/staging/values-openspeedtest.yaml || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync values.yaml from dev to staging"
+          else
+            echo "No changes to commit."
+          fi
+          
       - name: Push staging
         run: git push origin staging
