@@ -201,10 +201,10 @@ Pipeline stopped at: Helm Template Dry Run stage.
             steps {
                 script {
                     echo "========================================="
-                    echo " SDLC WORKFLOW STATUS : PASSED"
+                    echo " SDLC WORKFLOW STATUS: PASSED"
                     echo "========================================="
                     echo "✔ YAML Validation"
-                    echo "✔ Helm Lint (Hard Gate)"
+                    echo "✔ Helm Lint"
                     echo "✔ Helm Unit Tests"
                     echo "✔ Helm Template Dry Run"
                     echo "✔ Trivy Security Scan (Optional)"
