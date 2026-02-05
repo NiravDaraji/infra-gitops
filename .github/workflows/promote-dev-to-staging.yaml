@@ -2,14 +2,36 @@ name: Promote Dev To Staging
 
 on:
   workflow_dispatch:
+    inputs:
+      promotion_token:
+        description: "Jenkins-only promotion token"
+        required: true
+      approved_by:
+        description: "Approved by (Jenkins user)"
+        required: true
+
 permissions:
   contents: write
 
 jobs:
   promote:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository
+      
+      - name: Block non-Jenkins triggers
+        run: |
+          if [ "${{ github.event.inputs.promotion_token }}" != "${{ secrets.JENKINS_PROMOTION_TOKEN }}" ]; then
+            echo "BLOCKED"
+            echo "This workflow can ONLY be triggered by Jenkins"
+            echo "Manual GitHub UI triggers are not allowed"
+            exit 1
+          fi
+
+          echo "Authorised Jenkins promotion"
+          echo "Approved by: ${{ github.event.inputs.approved_by }}"
+
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Configure Git
@@ -17,23 +39,23 @@ jobs:
           git config --global user.name "NiravDaraji"
           git config --global user.email "nirav78692@gmail.com"
 
-      - name: Fetch Branches
+      - name: Fetch branches
         run: git fetch origin
 
-      - name: Merge dev → staging
+      - name: Merge dev to staging
         run: |
           git checkout -B staging origin/staging
           git merge origin/dev --no-edit
 
-      - name: Copy values-openspeedtest.yaml from dev to staging
+      - name: Sync values from dev to staging
         run: |
           cp environments/dev/values-openspeedtest.yaml environments/staging/values-openspeedtest.yaml
           git add environments/staging/values-openspeedtest.yaml || true
           if ! git diff --cached --quiet; then
-            git commit -m "Sync values.yaml from dev to staging"
+            git commit -m "Sync values.yaml from dev to staging (approved by ${{ github.event.inputs.approved_by }})"
           else
-            echo "No changes to commit."
+            echo "No changes to commit"
           fi
-          
+
       - name: Push staging
         run: git push origin staging
