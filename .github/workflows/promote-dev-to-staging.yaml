@@ -23,7 +23,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.promotion_token }}" != "${{ secrets.JENKINS_PROMOTION_TOKEN }}" ]; then
             echo "BLOCKED"
-            echo "This workflow can ONLY be triggered by Jenkins"
+            echo "This workflow can only be triggered by Jenkins"
             echo "Unauthorised trigger detected. Only Jenkins is permitted to start this workflow. Manual UI triggers or incorrect tokens are rejected."
             exit 1
           fi
