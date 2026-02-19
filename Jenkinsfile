@@ -11,6 +11,11 @@ pipeline {
             defaultValue: 'dev',
             description: 'Environment to validate (e.g. dev)'
         )
+        choice(
+            name: 'chartName',
+            choices: ['openspeedtest', 'thanos', 'wordpress', 'grafana', 'speedtest', 'test_repo'],
+            description: 'Select chart to validate'
+        )
     }
 
     stages {
@@ -25,7 +30,9 @@ pipeline {
             steps {
                 script {
                     env.ENVIRONMENT = params.environment ?: 'dev'
+                    env.SELECTED_CHART = params.chartName
                     echo "Using environment: ${env.ENVIRONMENT}"
+                    echo "Selected chart: ${env.SELECTED_CHART}"
                 }
             }
         }
@@ -33,32 +40,13 @@ pipeline {
         stage('Install Missing Tools') {
             steps {
                 script {
-                    echo "Checking and installing required tools..."
                     sh '''
                       set -e
                       for t in helm yamllint trivy argocd; do
                         if command -v "$t" >/dev/null 2>&1; then
                           echo "$t found at: $(command -v $t)"
-                          $t --version 2>/dev/null || true
                         else
                           echo "$t not found. Installing..."
-                          case "$t" in
-                            helm)
-                              curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-                              ;;
-                            yamllint)
-                              apt update && apt install -y yamllint
-                              ;;
-                            trivy)
-                              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-                              ;;
-                            argocd)
-                              curl -sSL -o /usr/local/bin/argocd \
-                                https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-                              chmod +x /usr/local/bin/argocd
-                              ;;
-                          esac
-                          echo "$t installed successfully."
                         fi
                       done
                     '''
@@ -66,210 +54,122 @@ pipeline {
             }
         }
 
-        /* ================= YAML LINT ================= */
+        /* ============= YAML LINT ============= */
         stage('YAML Lint') {
             steps {
                 script {
-                    try {
-                        echo "Running YAML lint..."
-                        sh 'yamllint -c .yamllint.yaml environments/dev/'
-                    } catch (err) {
-                        error """
-❌ SDLC FAILED: YAML LINT ERROR
-
-One or more YAML files contain syntax or formatting issues.
-Check the yamllint output above and fix the errors.
-
-Pipeline stopped at: YAML Validation stage.
-"""
-                    }
+                    sh """
+                        echo 'Running YAML Lint for ${env.ENVIRONMENT}...'
+                        yamllint environments/${env.ENVIRONMENT}/
+                    """
                 }
             }
         }
 
-        /* ================= HELM LINT ================= */
+        /* ============= HELM LINT ============= */
         stage('Helm Lint') {
             steps {
                 script {
-                    try {
-                        sh """
-                          set -e
-                          echo "Starting Helm lint validation..."
+                    sh """
+                        set -e
+                        chartPath="charts/${env.SELECTED_CHART}"
+                        valuesFile="environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
 
-                          for chart in charts/*; do
-                            chartName=\$(basename "\$chart")
-                            valuesFile="environments/${env.ENVIRONMENT}/values-\${chartName}.yaml"
+                        echo "Linting chart: \$chartPath"
 
-                            if [ -f "\$chart/Chart.yaml" ]; then
-                              echo "-----------------------------------------"
-                              echo "Linting chart: \$chart"
-
-                              if [ -f "\$valuesFile" ]; then
-                                echo "Using: \$valuesFile"
-                                helm lint "\$chart" --values "\$valuesFile"
-                              else
-                                echo "Values file not found. Using default lint."
-                                helm lint "\$chart"
-                              fi
-                            fi
-                          done
-
-                          echo "-----------------------------------------"
-                          echo "Helm lint validation PASSED for all charts."
-                        """
-                    } catch (err) {
-                        error """
-❌ SDLC FAILED: HELM LINT ERROR
-
-Helm chart validation failed.
-Fix Helm chart issues before proceeding.
-
-Pipeline stopped at: Helm Lint stage.
-"""
-                    }
+                        if [ -f "\$valuesFile" ]; then
+                            helm lint "\$chartPath" --values "\$valuesFile"
+                        else
+                            helm lint "\$chartPath"
+                        fi
+                    """
                 }
             }
         }
 
+        /* ============= HELM UNIT TESTS ============= */
         stage('Helm Unit Tests') {
             steps {
-                sh '''
-                  set -e
-                  helm plugin install https://github.com/helm-unittest/helm-unittest.git >/dev/null 2>&1 || true
-
-                  for chart in charts/*; do
-                    if [ -f "$chart/Chart.yaml" ] && [ -d "$chart/tests" ]; then
-                      echo "Running unit tests for: $chart"
-                      helm unittest "$chart"
-                    fi
-                  done
-                '''
-            }
-        }
-
-        /* ============ HELM TEMPLATE DRY RUN ============ */
-        stage('Helm Template Dry Run For All Charts') {
-            steps {
                 script {
-                    try {
-                        sh """
-                          set -e
-
-                          for chartDir in charts/*; do
-                            chartName=\$(basename "\$chartDir")
-                            valuesFile="environments/${env.ENVIRONMENT}/values-\${chartName}.yaml"
-
-                            echo "-----------------------------------------"
-                            echo "Running helm template for: \$chartName"
-
-                            if [ ! -f "\$valuesFile" ]; then
-                              echo "❌ Missing values file: \$valuesFile"
-                              exit 1
-                            fi
-
-                            helm template "\$chartName" "\$chartDir" \
-                              --values "\$valuesFile"
-                          done
-
-                          echo "Helm template dry-run completed successfully."
-                        """
-                    } catch (err) {
-                        error """
-❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
-
-Helm template failed.
-
-Pipeline stopped at: Helm Template Dry Run stage.
-"""
-                    }
+                    sh """
+                        chartPath="charts/${env.SELECTED_CHART}"
+                        if [ -d "\$chartPath/tests" ]; then
+                            helm unittest "\$chartPath"
+                        else
+                            echo "No unit tests found. Skipping."
+                        fi
+                    """
                 }
             }
         }
 
-        stage('Trivy Security Scan (config, optional)') {
+        /* ============= HELM TEMPLATE ============= */
+        stage('Helm Template Dry Run') {
             steps {
-                sh '''
-                  echo "Running Trivy config scan (non-blocking)..."
+                script {
+                    sh """
+                        set -e
+                        chartPath="charts/${env.SELECTED_CHART}"
+                        valuesFile="environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
 
-                  trivy config \
-                    --severity HIGH,CRITICAL \
-                    --include-non-failures \
-                    --exit-code 0 \
-                    .
-                '''
+                        echo "Templating chart: \$chartPath"
+
+                        if [ ! -f "\$valuesFile" ]; then
+                           echo "❌ Missing values file: \$valuesFile"
+                           exit 1
+                        fi
+
+                        helm template "${env.SELECTED_CHART}" "\$chartPath" --values "\$valuesFile"
+                    """
+                }
+            }
+        }
+
+        stage('Trivy Security Scan') {
+            steps {
+                sh "trivy config . --severity HIGH,CRITICAL --include-non-failures --exit-code 0"
             }
         }
 
         stage('App Status via ArgoCD') {
             steps {
-                sh '''
-                  echo "Checking ArgoCD application status..."
-
-                  argocd login 10.139.9.158:31181 \
-                    --username admin \
-                    --password Admin@1234 \
-                    --insecure
-
+                sh """
+                  argocd login 10.139.9.158:31181 --username admin --password Admin@1234 --insecure
                   argocd app list
-                '''
+                """
             }
         }
 
         stage('SDLC Summary') {
             steps {
                 script {
-                    echo "========================================="
-                    echo " SDLC WORKFLOW STATUS: PASSED"
-                    echo "========================================="
-                    echo "✔ YAML Validation"
-                    echo "✔ Helm Lint"
-                    echo "✔ Helm Unit Tests"
-                    echo "✔ Helm Template Dry Run"
-                    echo "✔ Trivy Security Scan (Optional)"
-                    echo "✔ ArgoCD Application Status Check"
-                    echo "-----------------------------------------"
-                    echo "Your SDLC workflow is validated."
-                    echo "You are eligible to promote this build to STAGING."
-                    echo "========================================="
-
+                    echo "SDLC workflow passed for chart: ${env.SELECTED_CHART}"
                     env.PROMOTION_ELIGIBLE = "true"
                 }
             }
         }
 
         stage('Promotion Approval') {
-            when {
-                expression { env.PROMOTION_ELIGIBLE == "true" }
-            }
+            when { expression { env.PROMOTION_ELIGIBLE == "true" } }
             steps {
-                input(
-                    message: 'SDLC validated successfully. Do you want to promote this build to STAGING?',
-                    ok: 'Yes, Promote'
-                )
+                input message: "Promote ${env.SELECTED_CHART} to STAGING?"
             }
         }
 
         stage('Trigger Promotion Workflow') {
-            when {
-                expression { env.PROMOTION_ELIGIBLE == "true" }
-            }
+            when { expression { env.PROMOTION_ELIGIBLE == "true" } }
             steps {
-                echo "Promotion approved."
-                echo "Triggering DEV to STAGING promotion workflow..."
-                echo "GitHub Actions pipeline handles deployment."
+                echo "Triggering promotion for ${env.SELECTED_CHART}"
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline completed successfully."
-        }
-        aborted {
-            echo "Pipeline aborted by user during promotion approval."
+            echo "Pipeline finished successfully."
         }
         failure {
-            echo "Pipeline failed. Promotion not allowed."
+            echo "Pipeline failed."
         }
     }
 }
