@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        ENVIRONMENT         = "${params.environment ?: 'dev'}"
         PROMOTION_ELIGIBLE  = "false"
     }
 
@@ -15,6 +14,15 @@ pipeline {
     }
 
     stages {
+
+        stage('Init Environment') {
+            steps {
+                script {
+                    ENVIRONMENT = params.environment ?: 'dev'
+                    echo "Using environment: ${ENVIRONMENT}"
+                }
+            }
+        }
 
         stage('Checkout') {
             steps {
@@ -91,12 +99,16 @@ Pipeline stopped at: YAML Validation stage.
                           for chart in charts/*; do
                             chartName=$(basename "$chart")
                             valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
+
                             if [ -f "$chart/Chart.yaml" ]; then
                               echo "-----------------------------------------"
                               echo "Linting chart: $chart"
+
                               if [ -f "$valuesFile" ]; then
+                                echo "Using: $valuesFile"
                                 helm lint "$chart" --values "$valuesFile"
                               else
+                                echo "Values file not found. Using default lint."
                                 helm lint "$chart"
                               fi
                             fi
