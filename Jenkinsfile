@@ -15,18 +15,19 @@ pipeline {
 
     stages {
 
-        stage('Init Environment') {
-            steps {
-                script {
-                    ENVIRONMENT = params.environment ?: 'dev'
-                    echo "Using environment: ${ENVIRONMENT}"
-                }
-            }
-        }
-
         stage('Checkout') {
             steps {
                 git branch: 'dev', url: 'https://github.com/NiravDaraji/infra-gitops.git'
+            }
+        }
+
+        stage('Init Environment') {
+            steps {
+                script {
+                    // Set AFTER checkout and use env. to persist reliably
+                    env.ENVIRONMENT = params.environment ?: 'dev'
+                    echo "Using environment: ${env.ENVIRONMENT}"
+                }
             }
         }
 
@@ -37,7 +38,7 @@ pipeline {
                     sh '''
                       set -e
                       for t in helm yamllint trivy argocd; do
-                        if command -v "$t" >/dev/null 2>&1; then
+                        if command -v "$t" &>/dev/null; then
                           echo "$t found at: $(command -v $t)"
                           $t --version 2>/dev/null || true
                         else
@@ -157,7 +158,7 @@ Pipeline stopped at: Helm Lint stage.
 
                           for chartDir in charts/*; do
                             chartName=$(basename "$chartDir")
-                            valuesFile="environments/dev/values-${chartName}.yaml"
+                            valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
 
                             echo "-----------------------------------------"
                             echo "Running helm template for: $chartName"
