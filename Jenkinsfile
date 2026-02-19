@@ -71,41 +71,42 @@ ${err}
             steps {
                 script {
                     try {
-                        // Use triple-double quotes to interpolate env vars on the Groovy side (env.ENVIRONMENT, env.SELECTED_CHART),
-                        // but in the shell block, only use $values_file (no ${values_file}) to avoid Groovy interpolation of shell vars.
-                        sh """
-                            set -e
-                            echo 'YAML Lint for chart: ${env.SELECTED_CHART}'
+                        // Pass ENV vars to shell; use single-quoted script to avoid Groovy interpolation.
+                        withEnv(["ENVIRONMENT=${env.ENVIRONMENT}", "SELECTED_CHART=${env.SELECTED_CHART}"]) {
+                            sh '''
+                                set -e
+                                echo "YAML Lint for chart: $SELECTED_CHART"
 
-                            # --- Lint selected chart templates ---
-                            echo '→ Linting templates: charts/${env.SELECTED_CHART}/'
-                            if yamllint -c .yamllint.yaml charts/${env.SELECTED_CHART}/ ; then
-                              echo '✅ No YAML issues in charts/${env.SELECTED_CHART}/'
-                            else
-                              echo '❌ YAML Lint FAILED for charts/${env.SELECTED_CHART}/'
-                              exit 1
-                            fi
+                                # --- Lint selected chart templates ---
+                                echo "→ Linting templates: charts/$SELECTED_CHART/"
+                                if yamllint -c .yamllint.yaml "charts/$SELECTED_CHART/"; then
+                                  echo "✅ No YAML issues in charts/$SELECTED_CHART/"
+                                else
+                                  echo "❌ YAML Lint FAILED for charts/$SELECTED_CHART/"
+                                  exit 1
+                                fi
 
-                            # --- Lint selected environment values file ---
-                            values_file="environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
-                            if [ -f "$values_file" ]; then
-                              echo "→ Linting values: $values_file"
-                              if yamllint -c .yamllint.yaml "$values_file" ; then
-                                echo "✅ No YAML issues in $values_file"
-                              else
-                                echo "❌ YAML Lint FAILED for $values_file"
-                                exit 1
-                              fi
-                            else
-                              echo "⚠️  Skipping values lint — file not found: $values_file"
-                            fi
-                        """
+                                # --- Lint selected environment values file ---
+                                values_file="environments/$ENVIRONMENT/values-$SELECTED_CHART.yaml"
+                                if [ -f "$values_file" ]; then
+                                  echo "→ Linting values: $values_file"
+                                  if yamllint -c .yamllint.yaml "$values_file"; then
+                                    echo "✅ No YAML issues in $values_file"
+                                  else
+                                    echo "❌ YAML Lint FAILED for $values_file"
+                                    exit 1
+                                  fi
+                                else
+                                  echo "⚠️  Skipping values lint — file not found: $values_file"
+                                fi
+                            '''
+                        }
                     } catch (err) {
                         error """
 ❌ SDLC FAILED: YAML LINT ERROR
 
 YAML validation failed for chart: ${env.SELECTED_CHART}.
-The stage now fails on any yamllint error (syntax/critical issues).
+The stage fails on any yamllint error (syntax/critical issues).
 Check the lint output above and correct values or templates.
 
 -----------------------------------------
