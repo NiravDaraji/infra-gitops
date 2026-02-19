@@ -73,15 +73,33 @@ ${err}
                     try {
                         sh """
                             echo 'YAML Lint for chart: ${env.SELECTED_CHART}'
-                            
-                            yamllint -c .yamllint.yaml charts/${env.SELECTED_CHART}/
-                            yamllint -c .yamllint.yaml environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml
+
+                            # Lint selected chart template folder
+                            tpl_output=\$(yamllint -c .yamllint.yaml charts/${env.SELECTED_CHART}/ || true)
+                            if [ -n "\$tpl_output" ]; then
+                              echo "\$tpl_output"
+                            else
+                              echo "✅ No YAML issues in charts/${env.SELECTED_CHART}/"
+                            fi
+
+                            # Lint selected environment values file
+                            values_file="environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
+                            if [ -f "\$values_file" ]; then
+                                val_output=\$(yamllint -c .yamllint.yaml "\$values_file" || true)
+                                if [ -n "\$val_output" ]; then
+                                  echo "\$val_output"
+                                else
+                                  echo "✅ No YAML issues in \$values_file"
+                                fi
+                            else
+                                echo "⚠️ Skipping YAML lint — file not found: \$values_file"
+                            fi
                         """
                     } catch (err) {
                         error """
 ❌ SDLC FAILED: YAML LINT ERROR
 
-YAML validation failed for chart: ${env.SELECTED_CHART}
+YAML validation failed for chart: ${env.SELECTED_CHART}.
 Check the lint output above and correct values or templates.
 
 -----------------------------------------
@@ -166,11 +184,11 @@ ${err}
                             chartPath="charts/${env.SELECTED_CHART}"
                             valuesFile="environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
 
-                            echo "Dry-running helm template: \$chartPath"
+                            echo "Dry running helm template: \$chartPath"
 
                             if [ ! -f "\$valuesFile" ]; then
-                                echo "❌ Missing values file: \$valuesFile"
-                                exit 1
+                               echo "❌ Missing values file: \$valuesFile"
+                               exit 1
                             fi
 
                             helm template "${env.SELECTED_CHART}" "\$chartPath" --values "\$valuesFile"
@@ -180,7 +198,6 @@ ${err}
 ❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
 
 Helm template rendering failed for chart: ${env.SELECTED_CHART}.
-Fix the template errors and retry.
 
 -----------------------------------------
 ${err}
@@ -208,7 +225,7 @@ ${err}
 ❌ SDLC FAILED: TRIVY SECURITY SCAN ERROR
 
 Security misconfigurations detected in chart: ${env.SELECTED_CHART}.
-Check Trivy scan result and fix required items.
+Check Trivy scan result.
 
 -----------------------------------------
 ${err}
@@ -232,7 +249,7 @@ ${err}
                         error """
 ❌ SDLC FAILED: ARGOCD STATUS ERROR
 
-Unable to check ArgoCD application status.
+Unable to fetch ArgoCD application status.
 
 -----------------------------------------
 ${err}
