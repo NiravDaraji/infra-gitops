@@ -71,6 +71,8 @@ ${err}
             steps {
                 script {
                     try {
+                        // Use triple-double quotes to interpolate env vars on the Groovy side (env.ENVIRONMENT, env.SELECTED_CHART),
+                        // but in the shell block, only use $values_file (no ${values_file}) to avoid Groovy interpolation of shell vars.
                         sh """
                             set -e
                             echo 'YAML Lint for chart: ${env.SELECTED_CHART}'
