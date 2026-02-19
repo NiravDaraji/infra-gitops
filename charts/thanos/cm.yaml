@@ -1,0 +1,463 @@
+apiVersion: v1
+data:
+  rules.yaml: "groups:\n- name: resources_usage\n  interval: 15m\n  rules:\n  - expr:
+    |-\n      100 * sum by (instance, namespace, container, node, pod) (\n        rate(container_cpu_usage_seconds_total[15m]))\n
+    \   record: namespace:cpu_usage_rate_per_container_15m:sum_15m\n\n  - expr: |-\n
+    \     sum by (container_namespace, container, cluster) (\n          increase(kepler_container_joules_total[15m])\n
+    \     ) / (3600000)\n    record: container_namespace:kepler_increase_power_consumption_kwh_15m:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (instance, namespace, container)\n          (rate(node_cpu_seconds_total{mode=\"idle\"}[15m]))
+    /\n          sum by (instance, namespace, container) (rate(node_cpu_seconds_total[15m]))))\n
+    \   record: namespace:node_cpu_usage_percentage_15m:sum_15m\n\n  - expr: |-\n
+    \     100 * sum by (instance, namespace, container, node, pod) (\n          (container_memory_usage_bytes)
+    /\n          on(instance) group_left(machine_memory_bytes) machine_memory_bytes)\n
+    \   record: namespace:percentage_memory_used_per_container_15m:sum_15m\n\n  -
+    expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by (instance,namespace)
+    /\n                  sum(node_memory_MemTotal_bytes) by (instance,namespace)))\n
+    \   record: namespace:memory_usage_percentage_per_instance_15m:sum_15m\n\n  -
+    expr: |-\n      sum by (namespace, container, cluster) (\n          rate(container_cpu_usage_seconds_total[15m])\n
+    \     ) / \n      sum(kube_pod_container_resource_limits{resource=\"cpu\"}) by
+    (namespace, container, cluster)\n    record: container:cpu_usage_percentage_of_allocated_limits_15m:sum_15m\n"
+  rules_analytics_10042025.yaml: "groups:\n- name: analytics_10042025\n  interval:
+    15m\n  rules:\n  - expr: |-\n      (sum by (namespace, cluster, instance, pod)
+    (\n          node_network_receive_errs_total + node_network_transmit_errs_total)
+    /\n      sum by (namespace, cluster, instance, pod) (\n          node_network_receive_packets_total
+    + node_network_transmit_packets_total)) * 100\n    record: namespace:network_congestion_ratio:sum_15m\n\n
+    \ - expr: |-\n      1 - (sum(kube_pod_container_status_restarts_total) by (namespace,
+    cluster, container, pod, instance) /\n          sum(kube_pod_container_status_running)
+    by (namespace, cluster, container, pod, instance))\n    record: namespace:stability_score:sum_15m\n
+    \ - expr: |-\n      (sum by (namespace, cluster, instance, pod) (\n          node_network_receive_errs_total
+    + node_network_transmit_errs_total) /\n      sum by (namespace, cluster, instance,
+    pod) (\n          node_network_receive_packets_total + node_network_transmit_packets_total))
+    * 100\n    record: namespace:network_congestion_ratio:sum_15m\n\n  - expr: |-\n
+    \     1 - (sum(kube_pod_container_status_restarts_total) by (namespace, cluster,
+    container, pod, instance) /\n          sum(kube_pod_container_status_running)
+    by (namespace, cluster, container, pod, instance))\n    record: namespace:stability_score:sum_15m\n\n
+    \ - expr: |-\n      sum(node_disk_io_time_seconds_total) by (namespace, cluster,
+    device, instance) /\n      sum(node_disk_reads_completed_total + node_disk_writes_completed_total)
+    by (namespace, cluster, device, instance)\n    record: namespace:storage_bottleneck_indicator:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by (namespace,
+    cluster, instance, pod) /\n                  sum(node_memory_MemTotal_bytes) by
+    (namespace, cluster, instance, pod)))\n    record: namespace:memory_pressure_index:sum_15m\n\n
+    \ - expr: |-\n      (sum(rate(container_cpu_usage_seconds_total[15m])) by (namespace,
+    cluster, container, node, pod) /\n      sum(kube_pod_container_resource_limits{resource=\"cpu\"})
+    by (namespace, cluster, container, node, pod)) * 100\n    record: namespace:cpu_efficiency_ratio_15m:sum_15m\n\n
+    \ - expr: |-\n      (sum(rate(container_cpu_usage_seconds_total[15m])) by (namespace,
+    cluster, container, node, pod) /\n      sum(kube_pod_container_resource_requests{resource=\"cpu\"})
+    by (namespace, cluster, container, node, pod)) +\n      (sum(container_memory_usage_bytes)
+    by (namespace, cluster, container, node, pod) /\n      sum(kube_pod_container_resource_requests{resource=\"memory\"})
+    by (namespace, cluster, container, node, pod))\n    record: namespace:resource_contention_index_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_network_receive_errs_total[15m])) by (namespace,
+    cluster, instance) +\n      sum(rate(node_network_transmit_errs_total[15m])) by
+    (namespace, cluster, instance)\n    record: namespace:network_errors_spike_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (namespace,
+    cluster, instance, device)\n    record: namespace:disk_io_time_abnormal_15m:sum_15m\n\n
+    \ - expr: |-\n      100 * (sum(rate(container_cpu_cfs_throttled_periods_total[15m]))
+    by (pod, namespace, cluster, node) /\n            sum(rate(container_cpu_cfs_periods_total[15m]))
+    by (pod, namespace, cluster, node))\n    record: namespace:cpu_throttling_rate_15m:sum_15m\n\n
+    \ - expr: |-\n      histogram_quantile(0.95, sum(rate(apiserver_request_duration_seconds_bucket[15m]))
+    by (namespace, cluster_name, verb, le))\n    record: apiserver:latency_95th_percentile_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (namespace,
+    cluster, device, instance) /\n      (sum(rate(node_disk_reads_completed_total[15m]))
+    by (namespace, cluster, device, instance) +\n      sum(rate(node_disk_writes_completed_total[15m]))
+    by (namespace, cluster, device, instance))\n    record: namespace:disk_io_contention_index_15m:sum_15m\n
+    \ - expr: |-\n      100 * (1 - (sum(node_filesystem_free_bytes{mountpoint=\"/\"})
+    by (namespace, cluster, instance, pod) /\n                  sum(node_filesystem_size_bytes{mountpoint=\"/\"})
+    by (namespace, cluster, instance, pod)))\n    record: namespace:disk_space_pressure_index:sum_15m\n\n
+    \ - expr: |-\n      (sum(rate(node_network_receive_bytes_total[15m])) by (namespace,
+    cluster, pod, instance) +\n      sum(rate(node_network_transmit_bytes_total[15m]))
+    by (namespace, cluster, pod, instance)) /\n      sum(node_network_speed_bytes)
+    by (namespace, cluster, pod, instance)\n    record: namespace:network_bandwidth_utilization_ratio_15m:sum_15m\n\n
+    \ - expr: |\n      (sum(rate(container_cpu_cfs_throttled_periods_total[15m]))
+    by (namespace, cluster, node, container))\n        / on(namespace, cluster) group_left()\n
+    \       max(node_hwmon_temp_celsius) by (namespace, cluster)  \n    record: namespace:cpu_throttling_per_temperature_unit_15m:ratio_15m\n\n
+    \ - expr: |\n      sum(rate(node_cpu_seconds_total{mode=\"user\"}[15m])) by (namespace,
+    cluster_name, instance)\n      / on(namespace, cluster_name, instance) group_left()\n
+    \     max(node_hwmon_temp_celsius) by (namespace, cluster_name, instance)\n    record:
+    namespace:cpu_usage_per_max_temperature_unit_15m:ratio_15m\n\n  - expr: |\n      (max
+    by (namespace, cluster_name, container, instance) (rate(node_disk_read_bytes_total[15m]))\n
+    \     + max by (namespace, cluster_name, container, instance) (rate(node_disk_written_bytes_total[15m])))\n
+    \     / on(namespace, cluster_name, container, instance) group_left\n      max
+    by (namespace, cluster_name, container, instance) (node_hwmon_temp_celsius)\n
+    \   record: namespace:max_disk_io_per_temperature_unit_15m:ratio_15m     \n  -
+    expr: |-\n      sum(kube_persistentvolume_status_phase) by (phase, namespace,
+    cluster, instance)\n    record: namespace:persistentvolume_status:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_network_receive_bytes_total[15m])) by (instance,
+    cluster, namespace)\n    record: namespace:network_receive_bytes_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_network_transmit_bytes_total[15m])) by (cluster,
+    namespace, instance)\n    record: namespace:network_transmit_bytes_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(container_fs_writes_total) by (namespace, cluster, node,
+    device, instance)\n    record: namespace:filesystem_writes:sum_15m\n\n  - expr:
+    |-\n      sum(rate(container_network_receive_bytes_total[15m])) by (cluster, namespace,
+    node, pod)\n    record: namespace:container_network_receive_15m:sum_15m\n\n  -
+    expr: |-\n      sum(rate(kubelet_http_requests_total[15m])) by (cluster, namespace,
+    node, instance)\n    record: namespace:kubelet_http_requests_15m:sum_15m\n\n  -
+    expr: |-\n      sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"})
+    by (cluster, node, namespace)\n    record: namespace:node_ready_status:sum_15m\n\n
+    \ - expr: |-\n      count(kube_node_status_condition) by (cluster, namespace,
+    node, condition, status)\n    record: namespace:node_condition_count:count_15m\n\n
+    \ - expr: |-\n      sum(rate(container_network_transmit_errors_total[15m])) by
+    (namespace, pod, cluster, node)\n    record: namespace:network_transmit_errors_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(container_network_transmit_packets_dropped_total[15m]))
+    by (pod, namespace, cluster, node)\n    record: namespace:network_packets_dropped_15m:sum_5m\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (device,
+    cluster, namespace, instance)\n    record: namespace:disk_io_time_15m:sum_15m\n
+    \ - expr: |-\n      sum(container_memory_usage_bytes) by (node, namespace, cluster,
+    container, pod)\n    record: namespace:container_memory_usage:sum_15m\n\n  - expr:
+    |-\n      100 * (1 - (\n      sum(node_filesystem_avail_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)\n      /\n      sum(node_filesystem_size_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)))\n    record: namespace:disk_usage_percentage:sum_15m\n
+    \ - expr: |-\n      sum(rate(node_cpu_seconds_total{mode=\"system\"}[15m])) by
+    (namespace, cluster, instance)\n    record: namespace:system_cpu_usage_15m:sum_15m\n
+    \ - expr: |-\n      100 * sum by (namespace, cluster, container, pod, node) (container_memory_usage_bytes)\n
+    \     /\n      sum by (namespace, cluster, container, pod, node) (kube_pod_container_resource_limits{resource=\"memory\"})\n
+    \   record: namespace:allocated_memory_utilization_container_percentage:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (namespace, cluster, container, instance)
+    (node_memory_MemAvailable_bytes)\n      /\n      sum by (namespace, cluster, container,
+    instance) (node_memory_MemTotal_bytes)))\n    record: namespace:node_memory_utilization_percentage:sum_15m\n
+    \ - expr: |-\n      sum by (namespace, cluster, pod) (rate(node_disk_reads_completed_total[15m]))*
+    on (namespace, cluster, pod)\n      group_left(node) topk by (namespace, cluster,
+    pod) (1, kube_pod_info)\n    record: namespace:disk_read_rate_per_pod_15m:sum_15m\n\n
+    \ - expr: |-\n      sum by (namespace, cluster, pod) (rate(node_disk_writes_completed_total[15m]))*
+    on (namespace, cluster, pod)\n      group_left(node) topk by (namespace, cluster,
+    pod) (1, kube_pod_info)\n    record: namespace:disk_write_rate_per_pod_15m:sum_15m\n
+    \ - expr: |-\n      sum by (namespace, cluster, pod) (kube_pod_status_phase{phase!=\"Running\"})
+    * on (namespace, cluster, pod)\n      group_left(node) topk by (namespace, cluster,
+    pod) (1, kube_pod_info{node!=\"\"})\n    record: namespace:non_running_pods:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (device,
+    cluster, namespace, instance)\n    record: namespace:disk_io_time_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(container_memory_usage_bytes) by (node, namespace, cluster,
+    container, pod)\n    record: namespace:container_memory_usage:sum_15m\n\n  - expr:
+    |-\n      100 * (1 - (\n      sum(node_filesystem_avail_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)\n      /\n      sum(node_filesystem_size_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)))\n    record: namespace:disk_usage_percentage:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_cpu_seconds_total{mode=\"system\"}[15m])) by
+    (namespace, cluster, instance)\n    record: namespace:system_cpu_usage_15m:sum_15m\n\n
+    \ - expr: |-\n      100 * sum by (namespace, cluster, container, pod, node) (container_memory_usage_bytes)\n
+    \     /\n      sum by (namespace, cluster, container, pod, node) (kube_pod_container_resource_limits{resource=\"memory\"})\n
+    \   record: namespace:allocated_memory_utilization_container_percentage:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (namespace, cluster, container, instance)
+    (node_memory_MemAvailable_bytes)\n      /\n      sum by (namespace, cluster, container,
+    instance) (node_memory_MemTotal_bytes)))\n    record: namespace:node_memory_utilization_percentage:sum_15m
+    \      \n"
+  rules_label_x_tim_identifier_power_consumption06092025.yaml: |
+    groups:
+    - name: rules_label_x_tim_identifier_power_consumption
+      interval: 5m
+      rules:
+      - expr: |-
+          sum by (cluster, label_x_tim_identifier, namespace, pod, mode) (
+          label_replace(
+            label_replace(
+              increase(kepler_container_joules_total[5m]) / 3.6e6,
+              "pod", "$1", "pod_name", "(.*)"
+            ),
+            "namespace", "$1", "container_namespace", "(.*)"
+          )
+          )
+          * on(pod, namespace) group_left(cluster, label_x_tim_identifier)
+          kube_pod_labels{label_x_tim_identifier!=""}
+        record: label_x_tim_identifier:kepler_increase_power_consumption_kwh:sum_5m
+  rules_label_x_tim_identifier_power_consumptionAPI06092025.yaml: |
+    groups:
+    - name: rules_label_x_tim_identifier_power_consumption_API_1m
+      interval: 1m
+      rules:
+      - expr: |-
+            sum by (cluster, label_x_tim_identifier, namespace, pod) (
+            label_replace(
+            label_replace(
+              increase(kepler_container_joules_total[1m]) / 3.6e6,
+              "pod", "$1", "pod_name", "(.*)"
+            ),
+            "namespace", "$1", "container_namespace", "(.*)"
+            )
+            )
+            * on(pod, namespace) group_left(cluster, label_x_tim_identifier)
+            kube_pod_labels{label_x_tim_identifier!=""}
+        record: label_x_tim_identifier:kepler_increase_power_consumption_kwh:sum_1m
+  rules_montioring_api_01042025.yaml: "groups:\n- name: montioring_api_01042025\n
+    \ interval: 5m\n  rules:\n  - expr: |-\n      sum by (container_namespace, cluster)
+    (\n          increase(kepler_container_joules_total[5m] offset 175s)\n      )
+    / (3600000)\n    record: container_namespace:kepler_increase_power_consumption_kwh:sum_5m_offset175\n\n
+    \ - expr: |-\n      100 * sum by (cluster, namespace) (\n          rate(container_cpu_usage_seconds_total[5m]
+    offset 175s)\n      )\n    record: cluster:cpu_usage_rate_per_namespace:sum_5m_offset175
+    \n\n  - expr: |-\n      100 * (1 - (sum by (namespace, cluster) (\n          rate(node_cpu_seconds_total{mode=\"idle\"}[5m]
+    offset 175s)) /\n          sum by (namespace, cluster) (\n          rate(node_cpu_seconds_total[5m]
+    offset 175s))\n      ))\n    record: cluster:cluster_cpu_usage_percentage_per_namespace:sum_5m_offset175
+    \  \n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes offset
+    175s) by (cluster, namespace) /\n                  sum(node_memory_MemTotal_bytes
+    offset 175s) by (cluster, namespace)))\n    record: cluster:memory_usage_percentage_per_namespace:sum_5m_offset175\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (namespace, cluster) (\n          avg_over_time(node_filesystem_free_bytes[5m]
+    offset 175s)) /\n          sum by (namespace, cluster) (\n          avg_over_time(node_filesystem_size_bytes[5m]
+    offset 175s))\n      ))\n    record: cluster_name:disk_usage_percentage_per_namespace:sum_5m_offset175
+    \                                 \n"
+  rules_montioring_api_25032025.yaml: "groups:\n- name: montioring_api_25032025\n
+    \ interval: 5m\n  rules:\n  - expr: |-\n      sum by (container_namespace,cluster)
+    (\n          increase(kepler_container_joules_total[5m])\n      ) / (3600000)\n
+    \   record: container_namespace:kepler_increase_power_consumption_kwh:sum_5m\n\n
+    \ - expr: |-\n      100 * sum by (cluster, namespace) (\n        rate(container_cpu_usage_seconds_total[5m]))\n
+    \   record: cluster:cpu_usage_rate_per_namespace:sum_5m \n\n  - expr: |-\n      100
+    * (1 - (sum by ( namespace, cluster)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))
+    /\n                 sum by (namespace, cluster) (rate(node_cpu_seconds_total[5m]))))
+    \         \n    record: cluster:cluster_cpu_usage_percentage_per_namespace:sum_5m
+    \  \n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by
+    (cluster,namespace) /\n                  sum(node_memory_MemTotal_bytes) by (cluster,namespace)))\n
+    \   record: cluster:memory_usage_percentage_per_namespace:sum_5m\n\n  - expr:
+    |-\n      100 * (1 - (sum by (namespace, cluster) (avg_over_time(node_filesystem_free_bytes[5m]))/\n
+    \               sum by (namespace, cluster) (avg_over_time(node_filesystem_size_bytes[5m]))))\n
+    \   record: cluster_name:disk_usage_percentage_per_namespace:sum_5m\n"
+  rules_power_consumption_montioring_api_13032025.yaml: "groups:\n- name: power_consumption_montioring_api_13032025\n
+    \ interval: 1m\n  rules:\n  - expr: |-\n      sum by (container_namespace,cluster)
+    (\n          increase(kepler_container_joules_total[1m])\n      ) / (3600000)\n
+    \   record: container_namespace:kepler_increase_power_consumption_kwh:sum_1m\n\n
+    \ - expr: |-\n      100 * sum by (cluster, namespace) (\n        rate(container_cpu_usage_seconds_total[1m]))\n
+    \   record: cluster:cpu_usage_rate_per_namespace:sum_1m \n\n  - expr: |-\n      100
+    * (1 - (sum by ( namespace, cluster)(rate(node_cpu_seconds_total{mode=\"idle\"}[1m]))
+    /\n                 sum by (namespace, cluster) (rate(node_cpu_seconds_total[1m]))))
+    \         \n    record: cluster:cluster_cpu_usage_percentage_per_namespace:sum_1m
+    \  \n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by
+    (cluster,namespace) /\n                  sum(node_memory_MemTotal_bytes) by (cluster,namespace)))\n
+    \   record: cluster:memory_usage_percentage_per_namespace:sum_1m\n\n  - expr:
+    |-\n      100 * (1 - (sum by (namespace, cluster) (avg_over_time(node_filesystem_free_bytes[1m]))/\n
+    \               sum by (namespace, cluster) (avg_over_time(node_filesystem_size_bytes[1m]))))\n
+    \   record: cluster_name:disk_usage_percentage_per_namespace:sum_1m\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"rules.yaml":"groups:\n- name: cpu_usage\n  interval: 5m\n  rules:\n  - expr: |-\n      100 * sum by (instance, namespace, container, node, pod) (\n        rate(container_cpu_usage_seconds_total[15m]))\n    record: cpu_usage_rate_per_container\n\n  - expr: |-\n      sum by (container_namespace, container, cluster) (\n          increase(kepler_container_joules_total[15m])\n      ) / (3600000)\n    record: average_power_consumption_kw\n\n  - expr: |-\n      100 * (1 - (sum by (instance, namespace, container)\n          (rate(node_cpu_seconds_total{mode=\"idle\"}[15m])) /\n          sum by (instance, namespace, container) (rate(node_cpu_seconds_total[15m]))))\n    record: node_cpu_usage_percentage\n\n  - expr: |-\n      100 * sum by (instance, namespace, container, node, pod) (\n          (container_memory_usage_bytes) /\n          on(instance) group_left(machine_memory_bytes) machine_memory_bytes)\n    record: percentage_memory_used_per_container\n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by (instance,namespace) /\n                  sum(node_memory_MemTotal_bytes) by (instance,namespace)))\n    record: memory_usage_percentage_per_instance_namespace\n\n  - expr: |-\n      sum by (namespace, container, cluster) (\n          rate(container_cpu_usage_seconds_total[15m])\n      ) / \n      sum(kube_pod_container_resource_limits{resource=\"cpu\"}) by (namespace, container, cluster)\n    record: cpu_usage_percentage_of_allocated_limits\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"thanos-ruler-rules","namespace":"ipcei"}}
+  name: thanos-ruler-rules
+  namespace:  default
+apiVersion: v1
+data:
+  rules.yaml: "groups:\n- name: resources_usage\n  interval: 15m\n  rules:\n  - expr:
+    |-\n      100 * sum by (instance, namespace, container, node, pod) (\n        rate(container_cpu_usage_seconds_total[15m]))\n
+    \   record: namespace:cpu_usage_rate_per_container_15m:sum_15m\n\n  - expr: |-\n
+    \     sum by (container_namespace, container, cluster) (\n          increase(kepler_container_joules_total[15m])\n
+    \     ) / (3600000)\n    record: container_namespace:kepler_increase_power_consumption_kwh_15m:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (instance, namespace, container)\n          (rate(node_cpu_seconds_total{mode=\"idle\"}[15m]))
+    /\n          sum by (instance, namespace, container) (rate(node_cpu_seconds_total[15m]))))\n
+    \   record: namespace:node_cpu_usage_percentage_15m:sum_15m\n\n  - expr: |-\n
+    \     100 * sum by (instance, namespace, container, node, pod) (\n          (container_memory_usage_bytes)
+    /\n          on(instance) group_left(machine_memory_bytes) machine_memory_bytes)\n
+    \   record: namespace:percentage_memory_used_per_container_15m:sum_15m\n\n  -
+    expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by (instance,namespace)
+    /\n                  sum(node_memory_MemTotal_bytes) by (instance,namespace)))\n
+    \   record: namespace:memory_usage_percentage_per_instance_15m:sum_15m\n\n  -
+    expr: |-\n      sum by (namespace, container, cluster) (\n          rate(container_cpu_usage_seconds_total[15m])\n
+    \     ) / \n      sum(kube_pod_container_resource_limits{resource=\"cpu\"}) by
+    (namespace, container, cluster)\n    record: container:cpu_usage_percentage_of_allocated_limits_15m:sum_15m\n"
+  rules_analytics_10042025.yaml: "groups:\n- name: analytics_10042025\n  interval:
+    15m\n  rules:\n  - expr: |-\n      (sum by (namespace, cluster, instance, pod)
+    (\n          node_network_receive_errs_total + node_network_transmit_errs_total)
+    /\n      sum by (namespace, cluster, instance, pod) (\n          node_network_receive_packets_total
+    + node_network_transmit_packets_total)) * 100\n    record: namespace:network_congestion_ratio:sum_15m\n\n
+    \ - expr: |-\n      1 - (sum(kube_pod_container_status_restarts_total) by (namespace,
+    cluster, container, pod, instance) /\n          sum(kube_pod_container_status_running)
+    by (namespace, cluster, container, pod, instance))\n    record: namespace:stability_score:sum_15m\n
+    \ - expr: |-\n      (sum by (namespace, cluster, instance, pod) (\n          node_network_receive_errs_total
+    + node_network_transmit_errs_total) /\n      sum by (namespace, cluster, instance,
+    pod) (\n          node_network_receive_packets_total + node_network_transmit_packets_total))
+    * 100\n    record: namespace:network_congestion_ratio:sum_15m\n\n  - expr: |-\n
+    \     1 - (sum(kube_pod_container_status_restarts_total) by (namespace, cluster,
+    container, pod, instance) /\n          sum(kube_pod_container_status_running)
+    by (namespace, cluster, container, pod, instance))\n    record: namespace:stability_score:sum_15m\n\n
+    \ - expr: |-\n      sum(node_disk_io_time_seconds_total) by (namespace, cluster,
+    device, instance) /\n      sum(node_disk_reads_completed_total + node_disk_writes_completed_total)
+    by (namespace, cluster, device, instance)\n    record: namespace:storage_bottleneck_indicator:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by (namespace,
+    cluster, instance, pod) /\n                  sum(node_memory_MemTotal_bytes) by
+    (namespace, cluster, instance, pod)))\n    record: namespace:memory_pressure_index:sum_15m\n\n
+    \ - expr: |-\n      (sum(rate(container_cpu_usage_seconds_total[15m])) by (namespace,
+    cluster, container, node, pod) /\n      sum(kube_pod_container_resource_limits{resource=\"cpu\"})
+    by (namespace, cluster, container, node, pod)) * 100\n    record: namespace:cpu_efficiency_ratio_15m:sum_15m\n\n
+    \ - expr: |-\n      (sum(rate(container_cpu_usage_seconds_total[15m])) by (namespace,
+    cluster, container, node, pod) /\n      sum(kube_pod_container_resource_requests{resource=\"cpu\"})
+    by (namespace, cluster, container, node, pod)) +\n      (sum(container_memory_usage_bytes)
+    by (namespace, cluster, container, node, pod) /\n      sum(kube_pod_container_resource_requests{resource=\"memory\"})
+    by (namespace, cluster, container, node, pod))\n    record: namespace:resource_contention_index_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_network_receive_errs_total[15m])) by (namespace,
+    cluster, instance) +\n      sum(rate(node_network_transmit_errs_total[15m])) by
+    (namespace, cluster, instance)\n    record: namespace:network_errors_spike_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (namespace,
+    cluster, instance, device)\n    record: namespace:disk_io_time_abnormal_15m:sum_15m\n\n
+    \ - expr: |-\n      100 * (sum(rate(container_cpu_cfs_throttled_periods_total[15m]))
+    by (pod, namespace, cluster, node) /\n            sum(rate(container_cpu_cfs_periods_total[15m]))
+    by (pod, namespace, cluster, node))\n    record: namespace:cpu_throttling_rate_15m:sum_15m\n\n
+    \ - expr: |-\n      histogram_quantile(0.95, sum(rate(apiserver_request_duration_seconds_bucket[15m]))
+    by (namespace, cluster_name, verb, le))\n    record: apiserver:latency_95th_percentile_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (namespace,
+    cluster, device, instance) /\n      (sum(rate(node_disk_reads_completed_total[15m]))
+    by (namespace, cluster, device, instance) +\n      sum(rate(node_disk_writes_completed_total[15m]))
+    by (namespace, cluster, device, instance))\n    record: namespace:disk_io_contention_index_15m:sum_15m\n
+    \ - expr: |-\n      100 * (1 - (sum(node_filesystem_free_bytes{mountpoint=\"/\"})
+    by (namespace, cluster, instance, pod) /\n                  sum(node_filesystem_size_bytes{mountpoint=\"/\"})
+    by (namespace, cluster, instance, pod)))\n    record: namespace:disk_space_pressure_index:sum_15m\n\n
+    \ - expr: |-\n      (sum(rate(node_network_receive_bytes_total[15m])) by (namespace,
+    cluster, pod, instance) +\n      sum(rate(node_network_transmit_bytes_total[15m]))
+    by (namespace, cluster, pod, instance)) /\n      sum(node_network_speed_bytes)
+    by (namespace, cluster, pod, instance)\n    record: namespace:network_bandwidth_utilization_ratio_15m:sum_15m\n\n
+    \ - expr: |\n      (sum(rate(container_cpu_cfs_throttled_periods_total[15m]))
+    by (namespace, cluster, node, container))\n        / on(namespace, cluster) group_left()\n
+    \       max(node_hwmon_temp_celsius) by (namespace, cluster)  \n    record: namespace:cpu_throttling_per_temperature_unit_15m:ratio_15m\n\n
+    \ - expr: |\n      sum(rate(node_cpu_seconds_total{mode=\"user\"}[15m])) by (namespace,
+    cluster_name, instance)\n      / on(namespace, cluster_name, instance) group_left()\n
+    \     max(node_hwmon_temp_celsius) by (namespace, cluster_name, instance)\n    record:
+    namespace:cpu_usage_per_max_temperature_unit_15m:ratio_15m\n\n  - expr: |\n      (max
+    by (namespace, cluster_name, container, instance) (rate(node_disk_read_bytes_total[15m]))\n
+    \     + max by (namespace, cluster_name, container, instance) (rate(node_disk_written_bytes_total[15m])))\n
+    \     / on(namespace, cluster_name, container, instance) group_left\n      max
+    by (namespace, cluster_name, container, instance) (node_hwmon_temp_celsius)\n
+    \   record: namespace:max_disk_io_per_temperature_unit_15m:ratio_15m     \n  -
+    expr: |-\n      sum(kube_persistentvolume_status_phase) by (phase, namespace,
+    cluster, instance)\n    record: namespace:persistentvolume_status:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_network_receive_bytes_total[15m])) by (instance,
+    cluster, namespace)\n    record: namespace:network_receive_bytes_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_network_transmit_bytes_total[15m])) by (cluster,
+    namespace, instance)\n    record: namespace:network_transmit_bytes_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(container_fs_writes_total) by (namespace, cluster, node,
+    device, instance)\n    record: namespace:filesystem_writes:sum_15m\n\n  - expr:
+    |-\n      sum(rate(container_network_receive_bytes_total[15m])) by (cluster, namespace,
+    node, pod)\n    record: namespace:container_network_receive_15m:sum_15m\n\n  -
+    expr: |-\n      sum(rate(kubelet_http_requests_total[15m])) by (cluster, namespace,
+    node, instance)\n    record: namespace:kubelet_http_requests_15m:sum_15m\n\n  -
+    expr: |-\n      sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"})
+    by (cluster, node, namespace)\n    record: namespace:node_ready_status:sum_15m\n\n
+    \ - expr: |-\n      count(kube_node_status_condition) by (cluster, namespace,
+    node, condition, status)\n    record: namespace:node_condition_count:count_15m\n\n
+    \ - expr: |-\n      sum(rate(container_network_transmit_errors_total[15m])) by
+    (namespace, pod, cluster, node)\n    record: namespace:network_transmit_errors_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(container_network_transmit_packets_dropped_total[15m]))
+    by (pod, namespace, cluster, node)\n    record: namespace:network_packets_dropped_15m:sum_5m\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (device,
+    cluster, namespace, instance)\n    record: namespace:disk_io_time_15m:sum_15m\n
+    \ - expr: |-\n      sum(container_memory_usage_bytes) by (node, namespace, cluster,
+    container, pod)\n    record: namespace:container_memory_usage:sum_15m\n\n  - expr:
+    |-\n      100 * (1 - (\n      sum(node_filesystem_avail_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)\n      /\n      sum(node_filesystem_size_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)))\n    record: namespace:disk_usage_percentage:sum_15m\n
+    \ - expr: |-\n      sum(rate(node_cpu_seconds_total{mode=\"system\"}[15m])) by
+    (namespace, cluster, instance)\n    record: namespace:system_cpu_usage_15m:sum_15m\n
+    \ - expr: |-\n      100 * sum by (namespace, cluster, container, pod, node) (container_memory_usage_bytes)\n
+    \     /\n      sum by (namespace, cluster, container, pod, node) (kube_pod_container_resource_limits{resource=\"memory\"})\n
+    \   record: namespace:allocated_memory_utilization_container_percentage:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (namespace, cluster, container, instance)
+    (node_memory_MemAvailable_bytes)\n      /\n      sum by (namespace, cluster, container,
+    instance) (node_memory_MemTotal_bytes)))\n    record: namespace:node_memory_utilization_percentage:sum_15m\n
+    \ - expr: |-\n      sum by (namespace, cluster, pod) (rate(node_disk_reads_completed_total[15m]))*
+    on (namespace, cluster, pod)\n      group_left(node) topk by (namespace, cluster,
+    pod) (1, kube_pod_info)\n    record: namespace:disk_read_rate_per_pod_15m:sum_15m\n\n
+    \ - expr: |-\n      sum by (namespace, cluster, pod) (rate(node_disk_writes_completed_total[15m]))*
+    on (namespace, cluster, pod)\n      group_left(node) topk by (namespace, cluster,
+    pod) (1, kube_pod_info)\n    record: namespace:disk_write_rate_per_pod_15m:sum_15m\n
+    \ - expr: |-\n      sum by (namespace, cluster, pod) (kube_pod_status_phase{phase!=\"Running\"})
+    * on (namespace, cluster, pod)\n      group_left(node) topk by (namespace, cluster,
+    pod) (1, kube_pod_info{node!=\"\"})\n    record: namespace:non_running_pods:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_disk_io_time_seconds_total[15m])) by (device,
+    cluster, namespace, instance)\n    record: namespace:disk_io_time_15m:sum_15m\n\n
+    \ - expr: |-\n      sum(container_memory_usage_bytes) by (node, namespace, cluster,
+    container, pod)\n    record: namespace:container_memory_usage:sum_15m\n\n  - expr:
+    |-\n      100 * (1 - (\n      sum(node_filesystem_avail_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)\n      /\n      sum(node_filesystem_size_bytes{mountpoint=\"/\"})
+    by (instance, namespace, cluster)))\n    record: namespace:disk_usage_percentage:sum_15m\n\n
+    \ - expr: |-\n      sum(rate(node_cpu_seconds_total{mode=\"system\"}[15m])) by
+    (namespace, cluster, instance)\n    record: namespace:system_cpu_usage_15m:sum_15m\n\n
+    \ - expr: |-\n      100 * sum by (namespace, cluster, container, pod, node) (container_memory_usage_bytes)\n
+    \     /\n      sum by (namespace, cluster, container, pod, node) (kube_pod_container_resource_limits{resource=\"memory\"})\n
+    \   record: namespace:allocated_memory_utilization_container_percentage:sum_15m\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (namespace, cluster, container, instance)
+    (node_memory_MemAvailable_bytes)\n      /\n      sum by (namespace, cluster, container,
+    instance) (node_memory_MemTotal_bytes)))\n    record: namespace:node_memory_utilization_percentage:sum_15m
+    \      \n"
+  rules_label_x_tim_identifier_power_consumption06092025.yaml: |
+    groups:
+    - name: rules_label_x_tim_identifier_power_consumption
+      interval: 5m
+      rules:
+      - expr: |-
+          sum by (cluster, label_x_tim_identifier, namespace, pod, mode) (
+          label_replace(
+            label_replace(
+              increase(kepler_container_joules_total[5m]) / 3.6e6,
+              "pod", "$1", "pod_name", "(.*)"
+            ),
+            "namespace", "$1", "container_namespace", "(.*)"
+          )
+          )
+          * on(pod, namespace) group_left(cluster, label_x_tim_identifier)
+          kube_pod_labels{label_x_tim_identifier!=""}
+        record: label_x_tim_identifier:kepler_increase_power_consumption_kwh:sum_5m
+  rules_label_x_tim_identifier_power_consumptionAPI06092025.yaml: |
+    groups:
+    - name: rules_label_x_tim_identifier_power_consumption_API_1m
+      interval: 1m
+      rules:
+      - expr: |-
+            sum by (cluster, label_x_tim_identifier, namespace, pod) (
+            label_replace(
+            label_replace(
+              increase(kepler_container_joules_total[1m]) / 3.6e6,
+              "pod", "$1", "pod_name", "(.*)"
+            ),
+            "namespace", "$1", "container_namespace", "(.*)"
+            )
+            )
+            * on(pod, namespace) group_left(cluster, label_x_tim_identifier)
+            kube_pod_labels{label_x_tim_identifier!=""}
+        record: label_x_tim_identifier:kepler_increase_power_consumption_kwh:sum_1m
+  rules_montioring_api_01042025.yaml: "groups:\n- name: montioring_api_01042025\n
+    \ interval: 5m\n  rules:\n  - expr: |-\n      sum by (container_namespace, cluster)
+    (\n          increase(kepler_container_joules_total[5m] offset 175s)\n      )
+    / (3600000)\n    record: container_namespace:kepler_increase_power_consumption_kwh:sum_5m_offset175\n\n
+    \ - expr: |-\n      100 * sum by (cluster, namespace) (\n          rate(container_cpu_usage_seconds_total[5m]
+    offset 175s)\n      )\n    record: cluster:cpu_usage_rate_per_namespace:sum_5m_offset175
+    \n\n  - expr: |-\n      100 * (1 - (sum by (namespace, cluster) (\n          rate(node_cpu_seconds_total{mode=\"idle\"}[5m]
+    offset 175s)) /\n          sum by (namespace, cluster) (\n          rate(node_cpu_seconds_total[5m]
+    offset 175s))\n      ))\n    record: cluster:cluster_cpu_usage_percentage_per_namespace:sum_5m_offset175
+    \  \n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes offset
+    175s) by (cluster, namespace) /\n                  sum(node_memory_MemTotal_bytes
+    offset 175s) by (cluster, namespace)))\n    record: cluster:memory_usage_percentage_per_namespace:sum_5m_offset175\n\n
+    \ - expr: |-\n      100 * (1 - (sum by (namespace, cluster) (\n          avg_over_time(node_filesystem_free_bytes[5m]
+    offset 175s)) /\n          sum by (namespace, cluster) (\n          avg_over_time(node_filesystem_size_bytes[5m]
+    offset 175s))\n      ))\n    record: cluster_name:disk_usage_percentage_per_namespace:sum_5m_offset175
+    \                                 \n"
+  rules_montioring_api_25032025.yaml: "groups:\n- name: montioring_api_25032025\n
+    \ interval: 5m\n  rules:\n  - expr: |-\n      sum by (container_namespace,cluster)
+    (\n          increase(kepler_container_joules_total[5m])\n      ) / (3600000)\n
+    \   record: container_namespace:kepler_increase_power_consumption_kwh:sum_5m\n\n
+    \ - expr: |-\n      100 * sum by (cluster, namespace) (\n        rate(container_cpu_usage_seconds_total[5m]))\n
+    \   record: cluster:cpu_usage_rate_per_namespace:sum_5m \n\n  - expr: |-\n      100
+    * (1 - (sum by ( namespace, cluster)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))
+    /\n                 sum by (namespace, cluster) (rate(node_cpu_seconds_total[5m]))))
+    \         \n    record: cluster:cluster_cpu_usage_percentage_per_namespace:sum_5m
+    \  \n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by
+    (cluster,namespace) /\n                  sum(node_memory_MemTotal_bytes) by (cluster,namespace)))\n
+    \   record: cluster:memory_usage_percentage_per_namespace:sum_5m\n\n  - expr:
+    |-\n      100 * (1 - (sum by (namespace, cluster) (avg_over_time(node_filesystem_free_bytes[5m]))/\n
+    \               sum by (namespace, cluster) (avg_over_time(node_filesystem_size_bytes[5m]))))\n
+    \   record: cluster_name:disk_usage_percentage_per_namespace:sum_5m\n"
+  rules_power_consumption_montioring_api_13032025.yaml: "groups:\n- name: power_consumption_montioring_api_13032025\n
+    \ interval: 1m\n  rules:\n  - expr: |-\n      sum by (container_namespace,cluster)
+    (\n          increase(kepler_container_joules_total[1m])\n      ) / (3600000)\n
+    \   record: container_namespace:kepler_increase_power_consumption_kwh:sum_1m\n\n
+    \ - expr: |-\n      100 * sum by (cluster, namespace) (\n        rate(container_cpu_usage_seconds_total[1m]))\n
+    \   record: cluster:cpu_usage_rate_per_namespace:sum_1m \n\n  - expr: |-\n      100
+    * (1 - (sum by ( namespace, cluster)(rate(node_cpu_seconds_total{mode=\"idle\"}[1m]))
+    /\n                 sum by (namespace, cluster) (rate(node_cpu_seconds_total[1m]))))
+    \         \n    record: cluster:cluster_cpu_usage_percentage_per_namespace:sum_1m
+    \  \n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by
+    (cluster,namespace) /\n                  sum(node_memory_MemTotal_bytes) by (cluster,namespace)))\n
+    \   record: cluster:memory_usage_percentage_per_namespace:sum_1m\n\n  - expr:
+    |-\n      100 * (1 - (sum by (namespace, cluster) (avg_over_time(node_filesystem_free_bytes[1m]))/\n
+    \               sum by (namespace, cluster) (avg_over_time(node_filesystem_size_bytes[1m]))))\n
+    \   record: cluster_name:disk_usage_percentage_per_namespace:sum_1m\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"rules.yaml":"groups:\n- name: cpu_usage\n  interval: 5m\n  rules:\n  - expr: |-\n      100 * sum by (instance, namespace, container, node, pod) (\n        rate(container_cpu_usage_seconds_total[15m]))\n    record: cpu_usage_rate_per_container\n\n  - expr: |-\n      sum by (container_namespace, container, cluster) (\n          increase(kepler_container_joules_total[15m])\n      ) / (3600000)\n    record: average_power_consumption_kw\n\n  - expr: |-\n      100 * (1 - (sum by (instance, namespace, container)\n          (rate(node_cpu_seconds_total{mode=\"idle\"}[15m])) /\n          sum by (instance, namespace, container) (rate(node_cpu_seconds_total[15m]))))\n    record: node_cpu_usage_percentage\n\n  - expr: |-\n      100 * sum by (instance, namespace, container, node, pod) (\n          (container_memory_usage_bytes) /\n          on(instance) group_left(machine_memory_bytes) machine_memory_bytes)\n    record: percentage_memory_used_per_container\n\n  - expr: |-\n      100 * (1 - (sum(node_memory_MemAvailable_bytes) by (instance,namespace) /\n                  sum(node_memory_MemTotal_bytes) by (instance,namespace)))\n    record: memory_usage_percentage_per_instance_namespace\n\n  - expr: |-\n      sum by (namespace, container, cluster) (\n          rate(container_cpu_usage_seconds_total[15m])\n      ) / \n      sum(kube_pod_container_resource_limits{resource=\"cpu\"}) by (namespace, container, cluster)\n    record: cpu_usage_percentage_of_allocated_limits\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"thanos-ruler-rules","namespace":"ipcei"}}
+  creationTimestamp: "2025-03-04T14:24:14Z"
+  name: thanos-ruler-rules
+  namespace: ipcei
+  resourceVersion: "167930085"
+  uid: c4df8151-f697-45d6-845f-789b0c57261e
