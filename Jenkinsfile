@@ -39,32 +39,6 @@ pipeline {
             }
         }
 
-        /* ================= VERIFY INPUTS ================= */
-        stage('Verify Inputs') {
-            steps {
-                script {
-                    sh """
-                      echo "VERIFICATION:"
-                      echo "  ENVIRONMENT     = ${env.ENVIRONMENT}"
-                      echo "  SELECTED_CHART  = ${env.SELECTED_CHART}"
-                      echo "  Repo root:"
-                      pwd
-                      echo "  Available env dirs under environments/:"
-                      ls -la environments || true
-                      echo "  Available charts under charts/:"
-                      ls -la charts || true
-                    """
-
-                    def valuesPath = "environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
-                    if (fileExists(valuesPath)) {
-                        echo "✅ Found values file: ${valuesPath}"
-                    } else {
-                        echo "⚠️  Values file not found (will be skipped later): ${valuesPath}"
-                    }
-                }
-            }
-        }
-
         /* ================= INSTALL TOOLS ================= */
         stage('Install Missing Tools') {
             steps {
