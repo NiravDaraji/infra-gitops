@@ -89,10 +89,16 @@ Pipeline stopped at: YAML Validation stage.
                           echo "Starting Helm lint validation..."
 
                           for chart in charts/*; do
+                            chartName=$(basename "$chart")
+                            valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
                             if [ -f "$chart/Chart.yaml" ]; then
                               echo "-----------------------------------------"
                               echo "Linting chart: $chart"
-                              helm lint "$chart"
+                              if [ -f "$valuesFile" ]; then
+                                helm lint "$chart" --values "$valuesFile"
+                              else
+                                helm lint "$chart"
+                              fi
                             fi
                           done
 
