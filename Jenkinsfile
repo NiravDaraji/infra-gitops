@@ -24,7 +24,6 @@ pipeline {
         stage('Init Environment') {
             steps {
                 script {
-                    // Set AFTER checkout and use env. to persist reliably
                     env.ENVIRONMENT = params.environment ?: 'dev'
                     echo "Using environment: ${env.ENVIRONMENT}"
                 }
@@ -38,7 +37,7 @@ pipeline {
                     sh '''
                       set -e
                       for t in helm yamllint trivy argocd; do
-                        if command -v "$t" &>/dev/null; then
+                        if command -v "$t" >/dev/null 2>&1; then
                           echo "$t found at: $(command -v $t)"
                           $t --version 2>/dev/null || true
                         else
@@ -93,31 +92,31 @@ Pipeline stopped at: YAML Validation stage.
             steps {
                 script {
                     try {
-                        sh '''
+                        sh """
                           set -e
                           echo "Starting Helm lint validation..."
 
                           for chart in charts/*; do
-                            chartName=$(basename "$chart")
-                            valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
+                            chartName=\$(basename "\$chart")
+                            valuesFile="environments/${env.ENVIRONMENT}/values-\${chartName}.yaml"
 
-                            if [ -f "$chart/Chart.yaml" ]; then
+                            if [ -f "\$chart/Chart.yaml" ]; then
                               echo "-----------------------------------------"
-                              echo "Linting chart: $chart"
+                              echo "Linting chart: \$chart"
 
-                              if [ -f "$valuesFile" ]; then
-                                echo "Using: $valuesFile"
-                                helm lint "$chart" --values "$valuesFile"
+                              if [ -f "\$valuesFile" ]; then
+                                echo "Using: \$valuesFile"
+                                helm lint "\$chart" --values "\$valuesFile"
                               else
                                 echo "Values file not found. Using default lint."
-                                helm lint "$chart"
+                                helm lint "\$chart"
                               fi
                             fi
                           done
 
                           echo "-----------------------------------------"
                           echo "Helm lint validation PASSED for all charts."
-                        '''
+                        """
                     } catch (err) {
                         error """
 ❌ SDLC FAILED: HELM LINT ERROR
@@ -153,27 +152,27 @@ Pipeline stopped at: Helm Lint stage.
             steps {
                 script {
                     try {
-                        sh '''
+                        sh """
                           set -e
 
                           for chartDir in charts/*; do
-                            chartName=$(basename "$chartDir")
-                            valuesFile="environments/${ENVIRONMENT}/values-${chartName}.yaml"
+                            chartName=\$(basename "\$chartDir")
+                            valuesFile="environments/${env.ENVIRONMENT}/values-\${chartName}.yaml"
 
                             echo "-----------------------------------------"
-                            echo "Running helm template for: $chartName"
+                            echo "Running helm template for: \$chartName"
 
-                            if [ ! -f "$valuesFile" ]; then
-                              echo "❌ Missing values file: $valuesFile"
+                            if [ ! -f "\$valuesFile" ]; then
+                              echo "❌ Missing values file: \$valuesFile"
                               exit 1
                             fi
 
-                            helm template "$chartName" "$chartDir" \
-                              --values "$valuesFile"
+                            helm template "\$chartName" "\$chartDir" \
+                              --values "\$valuesFile"
                           done
 
                           echo "Helm template dry-run completed successfully."
-                        '''
+                        """
                     } catch (err) {
                         error """
 ❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
