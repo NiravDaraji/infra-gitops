@@ -39,11 +39,10 @@ pipeline {
             }
         }
 
-        /* ================= VERIFY INPUTS (NEW) ================= */
+        /* ================= VERIFY INPUTS ================= */
         stage('Verify Inputs') {
             steps {
                 script {
-                    // Show what we’re about to use
                     sh """
                       echo "VERIFICATION:"
                       echo "  ENVIRONMENT     = ${env.ENVIRONMENT}"
@@ -56,15 +55,11 @@ pipeline {
                       ls -la charts || true
                     """
 
-                    // OPTIONAL: we *warn* if values file missing; switch to error to hard-fail here if you prefer.
                     def valuesPath = "environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
-                    if (!fileExists(valuesPath)) {
-                        echo "⚠️  Values file not found (will be skipped in YAML lint & Helm lint values override): ${valuesPath}"
-                        echo "    If this is unintended, create it or select the correct environment."
-                        // To hard-fail here instead, uncomment the next line:
-                        // error "Missing values file: ${valuesPath}"
-                    } else {
+                    if (fileExists(valuesPath)) {
                         echo "✅ Found values file: ${valuesPath}"
+                    } else {
+                        echo "⚠️  Values file not found (will be skipped later): ${valuesPath}"
                     }
                 }
             }
@@ -106,35 +101,30 @@ ${err}
             steps {
                 script {
                     try {
-                        // Pass ENV vars to shell; use single-quoted script to avoid Groovy interpolating $values_file.
-                        withEnv(["ENVIRONMENT=${env.ENVIRONMENT}", "SELECTED_CHART=${env.SELECTED_CHART}"]) {
-                            sh '''
+                        // Compute paths in Groovy to avoid shell-side ENV expansion issues
+                        def chartPath  = "charts/${env.SELECTED_CHART}"
+                        def valuesPath = "environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
+
+                        echo "YAML Lint for chart: ${env.SELECTED_CHART}"
+
+                        // --- Lint selected chart templates ---
+                        echo "→ Linting templates: ${chartPath}/"
+                        sh """
+                            set -e
+                            yamllint -c .yamllint.yaml "${chartPath}/"
+                        """
+                        echo "✅ No YAML issues in ${chartPath}/"
+
+                        // --- Lint selected environment values file ---
+                        if (fileExists(valuesPath)) {
+                            echo "→ Linting values: ${valuesPath}"
+                            sh """
                                 set -e
-                                echo "YAML Lint for chart: $SELECTED_CHART"
-
-                                # --- Lint selected chart templates ---
-                                echo "→ Linting templates: charts/$SELECTED_CHART/"
-                                if yamllint -c .yamllint.yaml "charts/$SELECTED_CHART/"; then
-                                  echo "✅ No YAML issues in charts/$SELECTED_CHART/"
-                                else
-                                  echo "❌ YAML Lint FAILED for charts/$SELECTED_CHART/"
-                                  exit 1
-                                fi
-
-                                # --- Lint selected environment values file ---
-                                values_file="environments/$ENVIRONMENT/values-$SELECTED_CHART.yaml"
-                                if [ -f "$values_file" ]; then
-                                  echo "→ Linting values: $values_file"
-                                  if yamllint -c .yamllint.yaml "$values_file"; then
-                                    echo "✅ No YAML issues in $values_file"
-                                  else
-                                    echo "❌ YAML Lint FAILED for $values_file"
-                                    exit 1
-                                  fi
-                                else
-                                  echo "⚠️  Skipping values lint — file not found: $values_file"
-                                fi
-                            '''
+                                yamllint -c .yamllint.yaml "${valuesPath}"
+                            """
+                            echo "✅ No YAML issues in ${valuesPath}"
+                        } else {
+                            echo "⚠️  Skipping values lint — file not found: ${valuesPath}"
                         }
                     } catch (err) {
                         error """
