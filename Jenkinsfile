@@ -66,33 +66,36 @@ ${err}
             }
         }
 
-        /* ================= YAML LINT ================= */
+        /* ================= YAML LINT (STRICT & FAILS ON ERRORS) ================= */
         stage('YAML Lint') {
             steps {
                 script {
                     try {
                         sh """
+                            set -e
                             echo 'YAML Lint for chart: ${env.SELECTED_CHART}'
 
-                            # Lint selected chart template folder
-                            tpl_output=\$(yamllint -c .yamllint.yaml charts/${env.SELECTED_CHART}/ || true)
-                            if [ -n "\$tpl_output" ]; then
-                              echo "\$tpl_output"
+                            # --- Lint selected chart templates ---
+                            echo '→ Linting templates: charts/${env.SELECTED_CHART}/'
+                            if yamllint -c .yamllint.yaml charts/${env.SELECTED_CHART}/ ; then
+                              echo '✅ No YAML issues in charts/${env.SELECTED_CHART}/'
                             else
-                              echo "✅ No Critical OR Major YAML issues in charts/${env.SELECTED_CHART}/"
+                              echo '❌ YAML Lint FAILED for charts/${env.SELECTED_CHART}/'
+                              exit 1
                             fi
 
-                            # Lint selected environment values file
+                            # --- Lint selected environment values file ---
                             values_file="environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
-                            if [ -f "\$values_file" ]; then
-                                val_output=\$(yamllint -c .yamllint.yaml "\$values_file" || true)
-                                if [ -n "\$val_output" ]; then
-                                  echo "\$val_output"
-                                else
-                                  echo "✅ No Critical OR Major YAML issues in \$values_file"
-                                fi
+                            if [ -f "$values_file" ]; then
+                              echo "→ Linting values: $values_file"
+                              if yamllint -c .yamllint.yaml "$values_file" ; then
+                                echo "✅ No YAML issues in $values_file"
+                              else
+                                echo "❌ YAML Lint FAILED for $values_file"
+                                exit 1
+                              fi
                             else
-                                echo "⚠️ Skipping YAML lint — file not found: \$values_file"
+                              echo "⚠️  Skipping values lint — file not found: $values_file"
                             fi
                         """
                     } catch (err) {
@@ -100,6 +103,7 @@ ${err}
 ❌ SDLC FAILED: YAML LINT ERROR
 
 YAML validation failed for chart: ${env.SELECTED_CHART}.
+The stage now fails on any yamllint error (syntax/critical issues).
 Check the lint output above and correct values or templates.
 
 -----------------------------------------
