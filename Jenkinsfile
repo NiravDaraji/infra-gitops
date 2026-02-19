@@ -27,10 +27,45 @@ pipeline {
         stage('Init Environment') {
             steps {
                 script {
-                    env.ENVIRONMENT = params.environment ?: 'dev'
+                    // Normalize and default the environment
+                    def rawEnv = (params.environment ?: '').trim()
+                    if (!rawEnv) { rawEnv = 'dev' }
+                    env.ENVIRONMENT = rawEnv
+
                     env.SELECTED_CHART = params.chartName
                     echo "Environment  : ${env.ENVIRONMENT}"
                     echo "Selected Chart: ${env.SELECTED_CHART}"
+                }
+            }
+        }
+
+        /* ================= VERIFY INPUTS (NEW) ================= */
+        stage('Verify Inputs') {
+            steps {
+                script {
+                    // Show what we’re about to use
+                    sh """
+                      echo "VERIFICATION:"
+                      echo "  ENVIRONMENT     = ${env.ENVIRONMENT}"
+                      echo "  SELECTED_CHART  = ${env.SELECTED_CHART}"
+                      echo "  Repo root:"
+                      pwd
+                      echo "  Available env dirs under environments/:"
+                      ls -la environments || true
+                      echo "  Available charts under charts/:"
+                      ls -la charts || true
+                    """
+
+                    // OPTIONAL: we *warn* if values file missing; switch to error to hard-fail here if you prefer.
+                    def valuesPath = "environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
+                    if (!fileExists(valuesPath)) {
+                        echo "⚠️  Values file not found (will be skipped in YAML lint & Helm lint values override): ${valuesPath}"
+                        echo "    If this is unintended, create it or select the correct environment."
+                        // To hard-fail here instead, uncomment the next line:
+                        // error "Missing values file: ${valuesPath}"
+                    } else {
+                        echo "✅ Found values file: ${valuesPath}"
+                    }
                 }
             }
         }
@@ -71,7 +106,7 @@ ${err}
             steps {
                 script {
                     try {
-                        // Pass ENV vars to shell; use single-quoted script to avoid Groovy interpolation.
+                        // Pass ENV vars to shell; use single-quoted script to avoid Groovy interpolating $values_file.
                         withEnv(["ENVIRONMENT=${env.ENVIRONMENT}", "SELECTED_CHART=${env.SELECTED_CHART}"]) {
                             sh '''
                                 set -e
