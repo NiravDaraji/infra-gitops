@@ -59,8 +59,13 @@ pipeline {
             steps {
                 script {
                     sh """
-                        echo 'Running YAML Lint for ${env.ENVIRONMENT}...'
-                        yamllint environments/${env.ENVIRONMENT}/
+                        echo 'YAML Lint for chart: ${env.SELECTED_CHART}'
+                        
+                        # Lint only selected chart templates
+                        yamllint -c .yamllint.yaml charts/${env.SELECTED_CHART}/
+
+                        # Lint only selected chart environment values
+                        yamllint -c .yamllint.yaml environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml
                     """
                 }
             }
@@ -115,8 +120,8 @@ pipeline {
                         echo "Templating chart: \$chartPath"
 
                         if [ ! -f "\$valuesFile" ]; then
-                           echo "❌ Missing values file: \$valuesFile"
-                           exit 1
+                            echo "❌ Missing values file: \$valuesFile"
+                            exit 1
                         fi
 
                         helm template "${env.SELECTED_CHART}" "\$chartPath" --values "\$valuesFile"
@@ -125,9 +130,18 @@ pipeline {
             }
         }
 
+        /* ============= TRIVY SCAN ============= */
         stage('Trivy Security Scan') {
             steps {
-                sh "trivy config . --severity HIGH,CRITICAL --include-non-failures --exit-code 0"
+                script {
+                    sh """
+                      echo "Running Trivy scan for ${env.SELECTED_CHART}"
+                      trivy config charts/${env.SELECTED_CHART} \
+                          --severity HIGH,CRITICAL \
+                          --include-non-failures \
+                          --exit-code 0
+                    """
+                }
             }
         }
 
