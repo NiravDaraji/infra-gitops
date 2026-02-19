@@ -79,7 +79,7 @@ ${err}
                             if [ -n "\$tpl_output" ]; then
                               echo "\$tpl_output"
                             else
-                              echo "✅ No YAML issues in charts/${env.SELECTED_CHART}/"
+                              echo "✅ No Critical OR Major YAML issues in charts/${env.SELECTED_CHART}/"
                             fi
 
                             # Lint selected environment values file
@@ -89,7 +89,7 @@ ${err}
                                 if [ -n "\$val_output" ]; then
                                   echo "\$val_output"
                                 else
-                                  echo "✅ No YAML issues in \$values_file"
+                                  echo "✅ No Critical OR Major YAML issues in \$values_file"
                                 fi
                             else
                                 echo "⚠️ Skipping YAML lint — file not found: \$values_file"
