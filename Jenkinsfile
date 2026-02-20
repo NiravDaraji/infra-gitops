@@ -282,7 +282,7 @@ ${err}
 ✔ Helm Unit Tests
 ✔ Helm Template Dry Run
 ✔ Trivy Security Scan
-✔ ArgoCD Status Check
+✔ ArgoCD APP Status Check
 -----------------------------------------
 Validated chart: ${env.SELECTED_CHART}
 Environment:     ${env.ENVIRONMENT}
