@@ -9,6 +9,9 @@ on:
       approved_by:
         description: "Approved by (Jenkins user)"
         required: true
+      chart:
+        description: "Chart name to promote"
+        required: true
 
 permissions:
   contents: write
@@ -18,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      
+
       - name: Block non-Jenkins triggers
         run: |
           if [ "${{ github.event.inputs.promotion_token }}" != "${{ secrets.JENKINS_PROMOTION_TOKEN }}" ]; then
@@ -30,9 +33,12 @@ jobs:
 
           echo "Authorised Jenkins promotion"
           echo "Approved by: ${{ github.event.inputs.approved_by }}"
+          echo "Chart: ${{ github.event.inputs.chart }}"
 
-      - name: Checkout repository
+      - name: Checkout repository (full history required)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure Git
         run: |
@@ -42,19 +48,41 @@ jobs:
       - name: Fetch branches
         run: git fetch origin
 
-      - name: Merge dev to staging
+      - name: Checkout staging branch
         run: |
           git checkout -B staging origin/staging
-          git merge origin/dev --no-edit
 
-      - name: Sync values from dev to staging
+      - name: Validate chart exists in dev
         run: |
-          cp environments/dev/values-openspeedtest.yaml environments/staging/values-openspeedtest.yaml
-          git add environments/staging/values-openspeedtest.yaml || true
-          if ! git diff --cached --quiet; then
-            git commit -m "Sync values.yaml from dev to staging (approved by ${{ github.event.inputs.approved_by }})"
+          FILE="environments/dev/values-${{ github.event.inputs.chart }}.yaml"
+
+          if git ls-tree -r origin/dev --name-only | grep -q "$FILE"; then
+            echo "Chart found in dev: $FILE"
           else
-            echo "No changes to commit"
+            echo "ERROR: Chart not found in dev → $FILE"
+            exit 1
+          fi
+
+      - name: Promote selected values.yaml from dev → staging
+        run: |
+          CHART=${{ github.event.inputs.chart }}
+
+          echo "Promoting chart: $CHART"
+
+          git checkout origin/dev -- environments/dev/values-${CHART}.yaml
+
+          # Copy into staging environment
+          cp environments/dev/values-${CHART}.yaml \
+             environments/staging/values-${CHART}.yaml
+
+      - name: Commit if there are changes
+        run: |
+          git add environments/staging/values-${{ github.event.inputs.chart }}.yaml || true
+
+          if git diff --cached --quiet; then
+            echo "No changes detected. Nothing to promote."
+          else
+            git commit -m "Promote ${{ github.event.inputs.chart }} from dev to staging (approved by ${{ github.event.inputs.approved_by }})"
           fi
 
       - name: Push staging
