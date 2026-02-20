@@ -84,7 +84,7 @@ jobs:
 
           cp "environments/dev/values-${CHART}.yaml" "environments/staging/values-${CHART}.yaml"
 
-      - name: Promote chart folder from dev -> staging
+      - name: Promote chart folder from dev to staging
         run: |
           CHART="${{ github.event.inputs.chart }}"
 
