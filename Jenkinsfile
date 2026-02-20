@@ -10,7 +10,7 @@ pipeline {
         choice(
             name: 'chartName',
             choices: ['openspeedtest', 'thanos', 'wordpress', 'grafana', 'speedtest', 'test_repo'],
-            description: 'Select chart to validate'
+            description: 'Select chart to validate '
         )
     }
 
@@ -27,7 +27,7 @@ pipeline {
         stage('Init Environment') {
             steps {
                 script {
-                    // Normalize and default the environment
+                    
                     def rawEnv = (params.environment ?: '').trim()
                     if (!rawEnv) { rawEnv = 'dev' }
                     env.ENVIRONMENT = rawEnv
@@ -43,62 +43,66 @@ pipeline {
         stage('Install Missing Tools') {
             steps {
                 script {
-                    try {
-                        sh '''
-                          set -e
-                          for t in helm yamllint trivy argocd; do
-                            if command -v "$t" >/dev/null 2>&1; then
-                              echo "$t found at: $(command -v $t)"
-                            else
-                              echo "$t not found. Please install manually or automate installation."
-                            fi
-                          done
-                        '''
-                    } catch (err) {
-                        error """
-❌ SDLC FAILED: TOOL INSTALLATION ERROR
-
-Required tools not installed or installation failed.
-Fix the issue and re-run the pipeline.
-
------------------------------------------
-${err}
------------------------------------------
-"""
-                    }
+                    echo "Checking and installing required tools..."
+                    sh '''
+                      set -e
+                      for t in helm yamllint trivy argocd; do
+                        if command -v "$t" >/dev/null 2>&1; then
+                          echo "$t found at: $(command -v $t)"
+                          $t --version 2>/dev/null || true
+                        else
+                          echo "$t not found. Installing..."
+                          case "$t" in
+                            helm)
+                              curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+                              ;;
+                            yamllint)
+                              apt update && apt install -y yamllint
+                              ;;
+                            trivy)
+                              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+                              ;;
+                            argocd)
+                              curl -sSL -o /usr/local/bin/argocd \
+                                https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                              chmod +x /usr/local/bin/argocd
+                              ;;
+                          esac
+                          echo "$t installed successfully."
+                        fi
+                      done
+                    '''
                 }
             }
         }
 
-        /* ================= YAML LINT (STRICT & FAILS ON ERRORS) ================= */
+        /* ================= YAML LINT ================= */
         stage('YAML Lint') {
             steps {
                 script {
                     try {
-                        // Compute paths in Groovy to avoid shell-side ENV expansion issues
+                        
                         def chartPath  = "charts/${env.SELECTED_CHART}"
                         def valuesPath = "environments/${env.ENVIRONMENT}/values-${env.SELECTED_CHART}.yaml"
 
                         echo "YAML Lint for chart: ${env.SELECTED_CHART}"
 
-                        // --- Lint selected chart templates ---
-                        echo "→ Linting templates: ${chartPath}/"
+                        echo "Linting templates: ${chartPath}/"
                         sh """
                             set -e
                             yamllint -c .yamllint.yaml "${chartPath}/"
                         """
-                        echo "✅ No YAML issues in ${chartPath}/"
+                        echo "✅ No YAML issues found in ${chartPath}/"
 
-                        // --- Lint selected environment values file ---
                         if (fileExists(valuesPath)) {
-                            echo "→ Linting values: ${valuesPath}"
+                            echo "Linting values: ${valuesPath}"
                             sh """
                                 set -e
                                 yamllint -c .yamllint.yaml "${valuesPath}"
                             """
-                            echo "✅ No YAML issues in ${valuesPath}"
+                            echo "✅ No YAML issues found in ${valuesPath}"
                         } else {
-                            echo "⚠️  Skipping values lint — file not found: ${valuesPath}"
+                            echo "⚠️ Skipping values lint — file not found: ${valuesPath}"
                         }
                     } catch (err) {
                         error """
@@ -203,7 +207,7 @@ ${err}
                         error """
 ❌ SDLC FAILED: HELM TEMPLATE DRY-RUN ERROR
 
-Helm template rendering failed for chart: ${env.SELECTED_CHART}.
+Helm template dry-run failed for chart: ${env.SELECTED_CHART}.
 
 -----------------------------------------
 ${err}
