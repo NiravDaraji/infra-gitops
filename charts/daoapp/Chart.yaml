@@ -1,0 +1,10 @@
+apiVersion: v2
+appVersion: v1.4.1
+description: 2048 is a number puzzle game.
+icon: https://daocloud.github.io/dao-2048/meta/apple-touch-icon.png
+name: dao-2048
+sources:
+- https://github.com/DaoCloud/dao-2048/
+- https://github.com/gabrielecirulli/2048
+type: application
+version: 1.4.1
