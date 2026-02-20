@@ -9,7 +9,7 @@ pipeline {
         )
         choice(
             name: 'chartName',
-            choices: ['openspeedtest', 'thanos', 'wordpress', 'grafana', 'speedtest', 'test_repo'],
+            choices: ['openspeedtest', 'thanos', 'daoapp', 'grafana', 'speedtest', 'test_repo'],
             description: 'Select chart to validate '
         )
     }
