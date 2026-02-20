@@ -35,7 +35,7 @@ jobs:
           echo "Approved by: ${{ github.event.inputs.approved_by }}"
           echo "Chart: ${{ github.event.inputs.chart }}"
 
-      - name: Checkout repository (full history required)
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -52,18 +52,18 @@ jobs:
         run: |
           git checkout -B staging origin/staging
 
-      - name: Validate chart exists in dev
+      - name: Validate values file exists in dev
         run: |
           FILE="environments/dev/values-${{ github.event.inputs.chart }}.yaml"
 
           if git ls-tree -r origin/dev --name-only | grep -q "$FILE"; then
-            echo "Chart found in dev: $FILE"
+            echo " YAML file found in dev: $FILE"
           else
-            echo "ERROR: Chart not found in dev → $FILE"
+            echo "ERROR: YAML file not found in dev: $FILE"
             exit 1
           fi
 
-      - name: Promote selected values.yaml from dev → staging
+      - name: Promote selected values.yaml from dev to staging
         run: |
           CHART=${{ github.event.inputs.chart }}
 
