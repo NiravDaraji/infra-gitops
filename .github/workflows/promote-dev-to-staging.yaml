@@ -10,7 +10,7 @@ on:
         description: "Approved by (Jenkins user)"
         required: true
       chart:
-        description: "Chart name to promote"
+        description: "Chart name to promote (folder under charts/ and values-<chart>.yaml)"
         required: true
 
 permissions:
@@ -21,16 +21,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Block non-Jenkins triggers
         run: |
           if [ "${{ github.event.inputs.promotion_token }}" != "${{ secrets.JENKINS_PROMOTION_TOKEN }}" ]; then
             echo "BLOCKED"
             echo "This workflow can only be triggered by Jenkins"
             echo "Unauthorised trigger detected. Only Jenkins is permitted to start this workflow. Manual UI triggers or incorrect tokens are rejected."
+
             exit 1
           fi
-
           echo "Authorised Jenkins promotion"
           echo "Approved by: ${{ github.event.inputs.approved_by }}"
           echo "Chart: ${{ github.event.inputs.chart }}"
@@ -46,44 +45,70 @@ jobs:
           git config --global user.email "nirav78692@gmail.com"
 
       - name: Fetch branches
-        run: git fetch origin
+        run: git fetch origin --prune
 
-      - name: Checkout staging branch
+      - name: Prepare local staging branch tracking origin/staging
         run: |
-          git checkout -B staging origin/staging
+          git checkout -B staging origin/staging || git checkout -b staging
 
       - name: Validate values file exists in dev
         run: |
-          FILE="environments/dev/values-${{ github.event.inputs.chart }}.yaml"
-
-          if git ls-tree -r origin/dev --name-only | grep -q "$FILE"; then
-            echo " YAML file found in dev: $FILE"
+          CHART="${{ github.event.inputs.chart }}"
+          FILE="environments/dev/values-${CHART}.yaml"
+          if git ls-tree -r origin/dev --name-only | grep -qx "$FILE"; then
+            echo "OK: Found $FILE in origin/dev"
           else
-            echo "ERROR: YAML file not found in dev: $FILE"
+            echo "ERROR: $FILE not found in origin/dev"
             exit 1
           fi
 
-      - name: Promote selected values.yaml from dev to staging
+      - name: Validate chart directory exists in dev
         run: |
-          CHART=${{ github.event.inputs.chart }}
+          CHART="${{ github.event.inputs.chart }}"
+          
+          if git ls-tree -r origin/dev --name-only | grep -qx "charts/${CHART}/Chart.yaml"; then
+            echo "OK: Found charts/${CHART} in origin/dev"
+          else
+            echo "Make sure the chart is committed to the dev branch under charts/${CHART}/"
+            exit 1
+          fi
 
-          echo "Promoting chart: $CHART"
+      - name: Promote values file from dev to staging
+        run: |
+          CHART="${{ github.event.inputs.chart }}"
 
-          git checkout origin/dev -- environments/dev/values-${CHART}.yaml
+          git checkout origin/dev -- "environments/dev/values-${CHART}.yaml"
 
-          # Copy into staging environment
-          cp environments/dev/values-${CHART}.yaml \
-             environments/staging/values-${CHART}.yaml
+          mkdir -p environments/staging
+
+
+          cp "environments/dev/values-${CHART}.yaml" "environments/staging/values-${CHART}.yaml"
+
+      - name: Promote chart folder from dev -> staging
+        run: |
+          CHART="${{ github.event.inputs.chart }}"
+
+          git checkout origin/dev -- "charts/${CHART}"
+
+          # Optional:
+          # uncomment the guard below to skip when it exists in staging.
+          # if [ -d "charts/${CHART}" ] && git ls-tree -r --name-only HEAD | grep -qx "charts/${CHART}/Chart.yaml"; then
+          #   echo "charts/${CHART} already exists on staging; skipping overwrite."
+          # fi
 
       - name: Commit if there are changes
         run: |
-          git add environments/staging/values-${{ github.event.inputs.chart }}.yaml || true
+          CHART="${{ github.event.inputs.chart }}"
+          git add "environments/staging/values-${CHART}.yaml" || true
+          git add "charts/${CHART}" || true
 
           if git diff --cached --quiet; then
             echo "No changes detected. Nothing to promote."
           else
-            git commit -m "Promote ${{ github.event.inputs.chart }} from dev to staging (approved by ${{ github.event.inputs.approved_by }})"
+            git commit -m "Promote ${CHART} from dev to staging (approved by ${{ github.event.inputs.approved_by }})"
           fi
 
       - name: Push staging
-        run: git push origin staging
+        run: |
+          # Push current local staging branch to origin/staging
+          git push origin staging
