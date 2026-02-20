@@ -4,7 +4,7 @@
 
 replicaCount: 1
 
-  image:
+image:
   registry: ghcr.io
   repository: daocloud/dao-2048
   pullPolicy: IfNotPresent
