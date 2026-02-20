@@ -1,4 +1,4 @@
-    global:
+global:
   imageRegistry: ''
   imagePullSecrets: []
   defaultStorageClass: ''
