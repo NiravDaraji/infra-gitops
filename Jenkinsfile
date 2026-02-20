@@ -294,10 +294,10 @@ Environment:     ${env.ENVIRONMENT}
 
     post {
         success {
-            echo "Pipeline completed successfully."
+            echo "SDLC validation pipeline completed successfully."
         }
         failure {
-            echo "Pipeline failed — check above error details."
+            echo "SDLC validation pipeline failed — check above error details."
         }
     }
 }
