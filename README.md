@@ -1,5 +1,5 @@
 
-# Deployment kit for dataspace installation
+### Deployment kit for dataspace installation
 tim-ds-kit provides the Helm-based deployment framework required to bootstrap and deploy a complete TIM Dataspace environment on Kubernetes using ArgoCD.
 A Dataspace is a trusted digital ecosystem where multiple organizations can securely exchange data without losing ownership or control of their data.
 
@@ -11,7 +11,7 @@ A Dataspace is a secure environment for
 •	Exchange data securely
 while maintaining full ownership and control of data assets.
 
-# TIM Dataspace Architecture:
+## TIM Dataspace Architecture:
 
 The architecture consists of two major layers:
 # Common Applications:
@@ -33,7 +33,6 @@ Dataspace-specific business services:
 •	TIM-EDC Data Plane
 •	DS-Catalog
 •	Federated Catalog
--- Together these components establish trust, manage digital identities, enable asset discovery, negotiate data-sharing agreements, and securely transfer data between Dataspace participants.
 
 # Repository Structure
 tim-ds-kit
@@ -65,7 +64,7 @@ tim-ds-kit
 │
 └── APP_Install.sh
 
-# Deployment Overview
+## Deployment Overview
 Deployment is performed in two phases:
 
 # Phase 1 - Bootstrap Installation
@@ -74,12 +73,14 @@ The Bootstrap Helm chart performs:
 •	Repository registration
 •	Git credential configuration
 •	Initial Dataspace bootstrap setup
-Component	Purpose
+Component	Purpose:
 
-00-argocd-namespace.yaml	Creates ArgoCD namespace
-git-secret.yaml	Stores Git repository credentials
-application-repos.yaml	Registers repositories in ArgoCD
-root-application.yaml	Creates root ArgoCD application
+|--------------------------------------------------------------|
+|00-argocd-namespace.yaml    |Creates ArgoCD namespace|
+|git-secret.yaml	           |Stores Git repository credentials|
+|application-repos.yaml	     |Registers repositories in ArgoCD|
+|---------------------------------------------------------------|
+
 
 # Phase 2 - Dataspace Application Installation
 The Application Helm chart deploys all Dataspace services through ArgoCD Applications.
