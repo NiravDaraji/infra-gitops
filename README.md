@@ -59,7 +59,6 @@ The Bootstrap Helm chart performs:
 > - PostgreSQL Operator
 > - Kafka / Confluent Operator
 > - Git Repository Integrations
-> - ArgoCD Bootstrap Configuration
 >
 > **Install the Bootstrap chart only once per Kubernetes cluster.** After the bootstrap process is completed, any additional Dataspace environments within the same cluster can be deployed directly using the Dataspace application Helm chart without reinstalling Bootstrap.
 
@@ -84,7 +83,7 @@ The Application Helm chart deploys all Dataspace services through ArgoCD Applica
 | Federated Catalog | Cross-participant Catalog |
 
 ## Prerequisites:
-Before starting the installation, ensure the following tools are available:
+Before starting the installation, ensure the following tools are available on the cluster:
 - Kubernetes
   
   Verify cluster access:
@@ -112,6 +111,7 @@ Required Access
 -   GitHub Username
 -   GitHub Personal Access Token (PAT)
 
+
 > [!IMPORTANT]
 > **Note:** This deployment kit assumes that **ArgoCD is not** installed on the cluster in the `argocd` namespace.
 >
@@ -128,7 +128,7 @@ Required Access
 > - PostgreSQL Operator
 > - Kafka / Confluent Operator
 >
-> ### 2. Create Bootstrap ArgoCD applications
+> ### 2. Deploy Bootstrap ArgoCD applications
 >
 > Navigate to:
 >
@@ -147,7 +147,7 @@ There are two ways to install the Bootstrap components:
 2. **Manual Installation** using Helm commands
 
 ### Option 1: Automated Installation using the helper script (Bootstrap_Install.sh)
-The repository provides an automated installation script: tim-ds-kit/dataspace-bootstrap/bootstrap/Bootstrap_Install.sh
+The repository provides an automated installation script: **tim-ds-kit/dataspace-bootstrap/bootstrap/Bootstrap_Install.sh**
 
 The script automatically:
 -  Requests GitHub credentials.
@@ -156,9 +156,8 @@ The script automatically:
 -  Applies required CRDs.
 -  Installs the Bootstrap Helm chart.
 -  Configures Git repository access.
--  Creates ArgoCD bootstrap applications.
 
-Execute Bootstrap Installation
+#### Execute Bootstrap Installation
 
 Download the `Bootstrap_Install.sh` script from:
 
@@ -180,19 +179,19 @@ Script Inputs
 
 You will be prompted for:
 
-    ```text
-    Enter GitHub Username:
-    Enter GitHub Token:
-    ```
+```text
+Enter GitHub Username:
+Enter GitHub Token:
+```
 
 Successful Output
 
 After successful execution you should see:
-    ```text
-    Bootstrap installation completed.
-    ```
+```text
+Bootstrap installation completed.
+```
 
-Verify Bootstrap Installation:
+**Verify Bootstrap Installation:**
 
 Verify Namespace and Pod status:
 
@@ -206,7 +205,7 @@ kubectl get pod -n argocd
 ```console
 kubectl get ns argocd
 NAME      STATUS   AGE
-argocd    Active   X
+argocd    Active   
 
 kubectl get pod -n argocd
 NAME                                               READY   STATUS 
@@ -247,7 +246,8 @@ bootstrap 	argocd 		deployed
 ### Option 2:  Manual Installation
 
 **Step 1: Clone repository**
-Replace the values below with your GitHub username and personal access token
+
+Replace the values below with your GitHub username and personal access token.
 
 ```bash
 git clone https://<GITHUB_USERNAME>:<GITHUB_TOKEN>@github.com/ipcei-tim-t3/tim-ds-kit.git
@@ -267,7 +267,7 @@ metadata:
     pod-security.kubernetes.io/warn: privileged
 EOF
 ```
-Verify:
+Verify argocd namespace:
 
 ```bash
 kubectl get ns argocd
@@ -285,6 +285,7 @@ kubectl apply -f crds/
 ```
 
 **Step 4: Install Bootstrap Helm Chart**
+
 Replace the placeholders with your GitHub credentials.
 
 ```bash
@@ -326,7 +327,8 @@ There are two deployment options:
 2. **Manual Installation** using Helm commands
 
 ### Option 1: Automated Installation using the helper script (APP_Install.sh)
-The repository provides:
+
+The repository provides an automated installation script: tim-ds-kit/charts/APP_install.sh
 
 APP_Install.sh script does
 
@@ -350,13 +352,13 @@ Script Inputs
 
 ```text
 Example:
-Enter Release Name (example: dataspace): dataspace
+Enter Release Name (example: dataspace): dataspace1
 Enter Chart Path (example: ./charts): /home/ds/tim-ds-kit/charts
 Enter Values File (example: values-governance.yaml): /home/ds/tim-ds-kit/charts/values-governance.yaml
 
 Installation Summary Example:
 
-Release Name : dataspace
+Release Name : dataspace1
 Chart Path : /home/ds/tim-ds-kit/charts
 Values File : /home/ds/tim-ds-kit/charts/values-governance.yaml
 Namespace : argocd
@@ -385,13 +387,14 @@ Kubectl get application -n argocd
 Ensure all applications show:
 
 ```console
-SYNC STATUS :   Synced
-HEALTH STATUS : Healthy
+SYNC STATUS   :     Synced
+HEALTH STATUS :     Healthy
 ```
 
 ### Option 2: Manual Installation
 
 **Step 1: Navigate to repository**
+
 Go to the location where:
 
 -	tim-ds-kit repository is cloned
@@ -426,12 +429,12 @@ Check Helm releases:
 ```bash
 helm ls -n argocd
 ```
-Expected Output:
+**Expected Output:**
 
 ```console
 NAME 		NAMESPACE 		REVISION 	STATUS
 bootstrap 	argocd 			1 		    deployed
-dataspace	argocd 			1 		    deployed
+dataspace1	argocd 			1 		    deployed
 ```
 
 **Step 4: Verify ArgoCD applications**
@@ -440,22 +443,14 @@ dataspace	argocd 			1 		    deployed
 kubectl get applications -n argocd
 ```
 
-### Useful Commands:
-
-View ArgoCD Applications
-
-```bash
-kubectl get applications -n argocd
-```
-View Application Details
-
-```bash
-kubectl describe application <application-name> -n argocd
-```
-### Troubleshooting:
+### Troubleshooting commands:
 
 ```bash
 kubectl get pod-n <namespace>
 kubectl describe pod <podname> -n <namespace>
+kubect  get pod <podname> -n <namespace> -o yaml
+kubectl get events -n <namespace>  --sort-by='.metadata.creationTimestamp'
 kubectl logs <podname> -n <namespace>
+kubectl get svc -n <namespace>
+helm status <release-name> -n <namespace>
 ```
