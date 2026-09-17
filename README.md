@@ -100,11 +100,10 @@ Required Access
 -   GitHub Personal Access Token (PAT)
 -   Permission to install resources in the cluster
    
-
-> [!IMPORTANT] **Note:**
-> This deployment kit assumes that **ArgoCD** is not already installed in the `argocd` namespace.
+> [!IMPORTANT]
+> **Note:** This deployment kit assumes that **ArgoCD is not** installed in the `argocd` namespace.
 >
-> If ArgoCD is already deployed in the `argocd` namespace, the following components must be installed manually:
+> If ArgoCD is already deployed in the `argocd` namespace, the following components must be installed manually.
 >
 > # 1. Install Required Operators
 >
