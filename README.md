@@ -118,7 +118,7 @@ Required Access
 >
 > If ArgoCD is already deployed in the `argocd` namespace, the following components must be installed manually.
 >
-> ### 1. Install Required Operators
+> ### 1. Install required Operators
 >
 > Navigate to:
 >
@@ -129,7 +129,7 @@ Required Access
 > - PostgreSQL Operator
 > - Kafka / Confluent Operator
 >
-> ### 2. Create Bootstrap ArgoCD Applications
+> ### 2. Create Bootstrap ArgoCD applications
 >
 > Navigate to:
 >
