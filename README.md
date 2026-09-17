@@ -73,6 +73,7 @@ The Application Helm chart deploys all Dataspace services through ArgoCD Applica
 # Prerequisites:
 Before starting the installation, ensure the following tools are available:
 - Kubernetes
+  
   Verify cluster access:
     ```bash
     kubectl cluster-info
@@ -80,12 +81,14 @@ Before starting the installation, ensure the following tools are available:
     ```
 
 - Helm
+  
   Verify Installation:
     ```bash
     helm version
     ```
 
 - Git
+  
   Verify Installation:
     ```bash
     git --version
