@@ -31,9 +31,9 @@ Dataspace-specific business services:
 -   Federated Catalog
 
 ## Deployment Overview
-Deployment is performed in two phases:
-    - Phase 1: Bootstrap Installation
-    - Phase 2: Dataspace Application Installation
+Deployment is performed in two phases
+    * Phase 1: Bootstrap Installation
+    * Phase 2: Dataspace Application Installation
 
 # Phase 1: Bootstrap Installation
 The Bootstrap Helm chart performs:
