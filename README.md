@@ -53,7 +53,7 @@ The Bootstrap Helm chart performs:
 > [!IMPORTANT]
 > **Bootstrap installation is a one-time activity per cluster.**
 >
-> The Bootstrap chart deploys and configures the foundational platform components required by the TIM Dataspace environment, including:
+> The Bootstrap chart prepares the Kubernetes cluster for Dataspace deployments by installing and configuring:
 >
 > - ArgoCD
 > - PostgreSQL Operator
