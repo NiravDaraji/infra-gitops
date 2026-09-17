@@ -111,7 +111,7 @@ Required Access
 -   Kubernetes Cluster Access
 -   GitHub Username
 -   GitHub Personal Access Token (PAT)
-   
+
 > [!IMPORTANT]
 > **Note:** This deployment kit assumes that **ArgoCD is not** installed on the cluster in the `argocd` namespace.
 >
