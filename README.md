@@ -1,5 +1,5 @@
 
-### Deployment kit for dataspace installation
+# Deployment kit for dataspace installation
 tim-ds-kit provides the Helm-based deployment framework required to bootstrap and deploy a complete TIM Dataspace environment on Kubernetes using ArgoCD..
 
 A Dataspace is a trusted digital ecosystem where multiple participants can securely exchange data without losing ownership or control of their data.
@@ -12,7 +12,7 @@ A Dataspace is a secure environment for :
 
 ## TIM Dataspace Architecture:
 **The architecture consists of two major layers:**
-# Common Applications:
+### Common Applications:
 -   Keycloak
 -   PostgreSQL
 -   OpenBao
@@ -20,7 +20,7 @@ A Dataspace is a secure environment for :
 -   Vault Webhook
 -   Kafka
 
-# TIM Applications:
+### TIM Applications:
 Dataspace-specific business services:
 
 -   IdentityHub
@@ -37,7 +37,7 @@ Deployment is performed in two phases:
 - Phase 1: Bootstrap Installation
 - Phase 2: Dataspace Application Installation
 
-# Phase 1: Bootstrap Installation
+## Phase 1: Bootstrap Installation
 The Bootstrap Helm chart performs:
 -   ArgoCD namespace creation
 -   Repository registration
@@ -64,7 +64,7 @@ The Bootstrap Helm chart performs:
 > **Install the Bootstrap chart only once per Kubernetes cluster.** After the bootstrap process is completed, any additional Dataspace environments within the same cluster can be deployed directly using the Dataspace application Helm chart without reinstalling Bootstrap.
 
 
-# Phase 2: Dataspace Application Installation
+## Phase 2: Dataspace Application Installation
 The Application Helm chart deploys all Dataspace services through ArgoCD Applications.
 
 | Service | Description |
@@ -83,7 +83,7 @@ The Application Helm chart deploys all Dataspace services through ArgoCD Applica
 | DS Catalog | Asset Discovery |
 | Federated Catalog | Cross-participant Catalog |
 
-# Prerequisites:
+## Prerequisites:
 Before starting the installation, ensure the following tools are available:
 - Kubernetes
   
@@ -118,7 +118,7 @@ Required Access
 >
 > If ArgoCD is already deployed in the `argocd` namespace, the following components must be installed manually.
 >
-> # 1. Install Required Operators
+> ### 1. Install Required Operators
 >
 > Navigate to:
 >
@@ -129,7 +129,7 @@ Required Access
 > - PostgreSQL Operator
 > - Kafka / Confluent Operator
 >
-> # 2. Create Bootstrap ArgoCD Applications
+> ### 2. Create Bootstrap ArgoCD Applications
 >
 > Navigate to:
 >
@@ -147,7 +147,7 @@ There are two ways to install the Bootstrap components:
 1. **Automated Installation** using the helper script (`Bootstrap_Install.sh`)
 2. **Manual Installation** using Helm commands
 
-# Option 1: Automated Installation using the helper script (Bootstrap_Install.sh)
+### Option 1: Automated Installation using the helper script (Bootstrap_Install.sh)
 The repository provides an automated installation script: tim-ds-kit/dataspace-bootstrap/bootstrap/Bootstrap_Install.sh
 
 The script automatically:
@@ -245,7 +245,7 @@ NAME 		NAMESPACE 	STATUS
 bootstrap 	argocd 		deployed
 ```
 
-# Option 2:  Manual Installation
+### Option 2:  Manual Installation
 
 **Step 1: Clone repository**
 Replace the values below with your GitHub username and personal access token
@@ -326,7 +326,7 @@ There are two deployment options:
 1. **Automated Installation** using the helper script (`APP_Install.sh`)
 2. **Manual Installation** using Helm commands
 
-# Option 1: Automated Installation using the helper script (APP_Install.sh)
+### Option 1: Automated Installation using the helper script (APP_Install.sh)
 The repository provides:
 
 APP_Install.sh script does
@@ -390,7 +390,7 @@ SYNC STATUS :   Synced
 HEALTH STATUS : Healthy
 ```
 
-# Option 2: Manual Installation
+### Option 2: Manual Installation
 
 **Step 1: Navigate to repository**
 Go to the location where:
@@ -441,7 +441,7 @@ dataspace	argocd 			1 		    deployed
 kubectl get applications -n argocd
 ```
 
-# Useful Commands:
+### Useful Commands:
 
 View ArgoCD Applications
 
@@ -453,7 +453,7 @@ View Application Details
 ```bash
 kubectl describe application <application-name> -n argocd
 ```
-# Troubleshooting:
+### Troubleshooting:
 
 ```bash
 kubectl get pod-n <namespace>
