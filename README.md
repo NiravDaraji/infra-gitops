@@ -21,7 +21,7 @@ A Dataspace is a secure environment for :
 -   Kafka
 
 ### TIM Applications:
-Dataspace-specific business services:
+Dataspace-specific services:
 
 -   IdentityHub
 -   IssuerService
@@ -30,7 +30,7 @@ Dataspace-specific business services:
 -   DS-catalog
 -   Federated Catalog
 
-## Deployment Overview
+# Deployment Overview
 
 Deployment is performed in two phases:
 
@@ -287,6 +287,7 @@ kubectl apply -f crds/
 **Step 4: Install Bootstrap Helm Chart**
 
 Replace the placeholders with your GitHub credentials.
+**Run from the dataspace-bootstrap/bootstrap/values.yaml path**
 
 ```bash
 helm upgrade --install bootstrap . \
@@ -323,10 +324,10 @@ The deployment supports any valid values file generated for your environment, fo
 You can install the Dataspace environment using any custom values file that **contains the required configuration for your deployment.**
 
 There are two deployment options:
-1. **Automated Installation** using the helper script (`APP_Install.sh`)
+1. **Automated Installation** using the helper script (`APP_install.sh`)
 2. **Manual Installation** using Helm commands
 
-### Option 1: Automated Installation using the helper script (APP_Install.sh)
+### Option 1: Automated Installation using the helper script (APP_install.sh)
 
 The repository provides an automated installation script: tim-ds-kit/charts/APP_install.sh
 
@@ -348,7 +349,7 @@ Run the installer:
 ./APP_install.sh
 ```
 
-Script Inputs
+Script Inputs:
 
 ```text
 Example:
@@ -443,6 +444,42 @@ dataspace1	argocd 			1 		    deployed
 kubectl get applications -n argocd
 ```
 
+Expected output example:
+
+```console
+kubectl get application -n argocd
+NAME                                         SYNC STATUS   HEALTH STATUS
+argocd-repositories                          Synced        Healthy
+commonapp-common01-kafka                     Synced        Healthy
+commonapp-common01-keycloak                  Synced        Healthy
+commonapp-common01-openbao                   Synced        Healthy
+commonapp-common01-openbao-init              Synced        Healthy
+commonapp-common01-postgres                  Synced        Healthy
+commonapp-common01-vault-webhook             Synced        Healthy
+commonapp-smko-keycloak                      Synced        Healthy
+commonapp-smko-openbao                       Synced        Healthy
+commonapp-smko-openbao-init                  Synced        Healthy
+commonapp-smko-postgres                      Synced        Healthy
+commonapp-smko-vault-webhook                 Synced        Healthy
+timapp-authority01-federated-catalog         Synced        Healthy
+timapp-authority01-x5fijtnd1y-dscatalog      Synced        Healthy
+timapp-common01-identityhub                  Synced        Healthy
+timapp-common01-issuerservice                Synced        Healthy
+timapp-consumer01-x5fijtnd1y-dscatalog       Synced        Healthy
+timapp-consumer01-x5fijtnd1y-tim-edc         Synced        Healthy
+timapp-dataprovider01-x5fijtnd1y-dscatalog   Synced        Healthy
+timapp-dataprovider01-x5fijtnd1y-tim-edc     Synced        Healthy
+timapp-smko-identityhub                      Synced        Healthy
+timapp-smko-issuerservice                    Synced        Healthy
+timapp-smkoau01-federated-catalog            Synced        Healthy
+timapp-smkoau01-smkoeuzprm-dscatalog         Synced        Healthy
+timapp-smkodp01-smkoeuzprm-dscatalog         Synced        Healthy
+timapp-smkodp01-smkoeuzprm-tim-edc           Synced        Healthy
+timapp-smkodp02-smkoeuzprm-dscatalog         Synced        Healthy
+timapp-smkodp02-smkoeuzprm-tim-edc           Synced        Healthy
+timapp-smkodp03-smkoeuzprm-dscatalog         Synced        Healthy
+timapp-smkodp03-smkoeuzprm-tim-edc           Synced        Healthy
+```
 ### Troubleshooting commands:
 
 ```bash
